@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AuK Studio · 声音克隆 — 重构原型</title>
+<style>
+/* ============ 主题令牌 ============ */
+:root{
+  --font-display:"Georgia","Times New Roman","Songti SC","Noto Serif CJK SC","SimSun",serif;
+  --font-body:-apple-system,"PingFang SC","Microsoft YaHei UI","Segoe UI",sans-serif;
+  --font-mono:"Consolas","Cascadia Mono","JetBrains Mono","Menlo",monospace;
+}
+html[data-theme="light"]{
+  --bg:#f4efe4;
+  --bg-deep:#ece5d5;
+  --panel:#fbf8f0;
+  --panel-2:#f2ecdd;
+  --line:#d8cfba;
+  --line-strong:#b9ac8e;
+  --ink:#211d15;
+  --ink-soft:#5c5546;
+  --muted:#8d8471;
+  --accent:#a97b1f;
+  --accent-hi:#8a6420;
+  --accent-soft:rgba(169,123,31,.12);
+  --good:#3e7a4e;
+  --shadow:0 1px 0 rgba(80,64,20,.06),0 12px 32px -18px rgba(80,64,20,.25);
+  --grain-op:.35;
+}
+html[data-theme="dark"]{
+  --bg:#121316;
+  --bg-deep:#0d0e10;
+  --panel:#1a1c20;
+  --panel-2:#22252a;
+  --line:#333840;
+  --line-strong:#4b525d;
+  --ink:#eef1f5;
+  --ink-soft:#c3c9d2;
+  --muted:#8b93a0;
+  --accent:#e9b95c;
+  --accent-hi:#f5cd7d;
+  --accent-soft:rgba(233,185,92,.12);
+  --good:#7fc98f;
+  --shadow:0 1px 0 rgba(255,255,255,.03),0 16px 40px -20px rgba(0,0,0,.8);
+  --grain-op:.5;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{height:100%}
+body{
+  min-height:100%;background:var(--bg);color:var(--ink);
+  font:15px/1.7 var(--font-body);
+  letter-spacing:.01em;
+  transition:background .35s,color .35s;
+  position:relative;
+}
+/* 颗粒质感 */
+body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;opacity:var(--grain-op);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .04 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+::selection{background:var(--accent-soft);color:var(--ink)}
+
+/* ============ 顶栏 ============ */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;gap:18px;
+  height:58px;padding:0 26px;
+  background:color-mix(in srgb,var(--bg) 82%,transparent);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.brand{display:flex;align-items:baseline;gap:9px;font-family:var(--font-display)}
+.brand b{font-size:19px;letter-spacing:.06em}
+.brand b i{font-style:normal;color:var(--accent)}
+.brand span{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);font-family:var(--font-body)}
+.crumb{font-size:12.5px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.crumb em{font-style:normal;color:var(--ink-soft)}
+.topright{margin-left:auto;display:flex;align-items:center;gap:14px}
+/* 顶部资源条 */
+.syschips{display:flex;gap:8px}
+.chip{
+  display:flex;align-items:center;gap:6px;
+  font:11px/1 var(--font-mono);color:var(--ink-soft);
+  border:1px solid var(--line);border-radius:999px;padding:6px 11px;
+  background:var(--panel);
+}
+.chip .dot{width:6px;height:6px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 20%,transparent)}
+.chip.warn .dot{background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.chip b{color:var(--ink);font-weight:600}
+.themebtn{
+  cursor:pointer;border:1px solid var(--line-strong);background:var(--panel);color:var(--ink-soft);
+  border-radius:999px;padding:6px 14px;font:12px var(--font-body);letter-spacing:.1em;
+  display:flex;align-items:center;gap:7px;transition:.25s;
+}
+.themebtn:hover{border-color:var(--accent);color:var(--accent)}
+.themebtn .glyph{font-size:13px;line-height:1}
+
+/* ============ 页面骨架 ============ */
+.shell{max-width:1440px;margin:0 auto;padding:34px 34px 80px;display:grid;grid-template-columns:64px minmax(0,1.35fr) minmax(340px,.85fr);gap:26px;align-items:start}
+
+/* 左侧标尺轨 */
+.rail{position:sticky;top:92px;height:calc(100vh - 120px);display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:8px 0}
+.rail .vtxt{writing-mode:vertical-lr;font:11px var(--font-mono);letter-spacing:.42em;text-transform:uppercase;color:var(--muted)}
+.rail .ticks{flex:1;width:1px;margin:16px 0;background:
+  repeating-linear-gradient(to bottom,var(--line-strong) 0 1px,transparent 1px 14px);
+  position:relative;opacity:.75}
+.rail .ticks::after{content:"";position:absolute;left:-4px;top:var(--tick,0%);width:9px;height:9px;border:1.5px solid var(--accent);border-radius:50%;background:var(--bg);transition:top .6s cubic-bezier(.6,0,.2,1)}
+.rail .gold{font-family:var(--font-display);font-size:22px;color:var(--accent);transform:rotate(45deg)}
+
+/* ============ 通用卡片 ============ */
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  box-shadow:var(--shadow);position:relative;overflow:hidden;
+}
+.card+.card{margin-top:22px}
+.card::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,var(--accent),transparent 45%);opacity:.55}
+.card-hd{
+  display:flex;align-items:center;gap:14px;
+  padding:16px 22px 0;
+}
+.stepno{font-family:var(--font-display);font-size:34px;line-height:1;color:var(--accent);opacity:.9;font-style:italic}
+.card-hd .t{font-size:15.5px;font-weight:650;letter-spacing:.04em}
+.card-hd .t small{display:block;font:11px var(--font-body);font-weight:400;color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:2px}
+.card-hd .tail{margin-left:auto;display:flex;align-items:center;gap:10px}
+.card-bd{padding:14px 22px 22px}
+.badge{font:11px var(--font-mono);color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 10px;letter-spacing:.06em}
+.badge.gold{color:var(--accent-hi);border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:var(--accent-soft)}
+
+/* ============ 上传区 ============ */
+.drop{
+  border:1.5px dashed var(--line-strong);border-radius:12px;
+  padding:30px 22px;text-align:center;cursor:pointer;
+  background:
+    radial-gradient(420px 120px at 50% 0%,var(--accent-soft),transparent 70%),
+    var(--panel-2);
+  transition:border-color .25s,background .25s,transform .15s;
+}
+.drop:hover,.drop.over{border-color:var(--accent);transform:translateY(-1px)}
+.drop .up{font-size:15px;font-weight:600;letter-spacing:.05em}
+.drop .up i{font-style:normal;color:var(--accent);font-size:17px;margin-right:6px}
+.drop .sub{font:11.5px var(--font-mono);color:var(--muted);margin-top:6px;letter-spacing:.08em}
+/* 已选文件 */
+.filechip{display:none;margin-top:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2);padding:12px 14px;gap:12px;align-items:center}
+.filechip.on{display:flex;animation:rise .35s ease both}
+.filechip .fic{width:38px;height:38px;border-radius:9px;flex:none;display:grid;place-items:center;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);color:var(--accent-hi);font-size:16px}
+.filechip .meta{min-width:0;flex:1}
+.filechip .meta b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.filechip .meta small{font:11px var(--font-mono);color:var(--muted)}
+.wave{display:flex;align-items:center;gap:2px;height:26px;flex:none;padding:0 4px}
+.wave i{width:2.5px;border-radius:2px;background:var(--line-strong);height:20%}
+.wave.playing i{background:var(--accent);animation:wv 1s ease-in-out infinite}
+@keyframes wv{0%,100%{height:22%}50%{height:92%}}
+.minibtn{
+  flex:none;cursor:pointer;font:12px var(--font-body);color:var(--ink-soft);
+  border:1px solid var(--line-strong);background:var(--panel);border-radius:8px;padding:6px 12px;transition:.2s;
+}
+.minibtn:hover{color:var(--accent);border-color:var(--accent)}
+
+/* ============ 文本区 ============ */
+.ta{
+  width:100%;min-height:118px;resize:vertical;
+  background:var(--panel-2);border:1px solid var(--line);border-radius:12px;
+  padding:14px 16px;color:var(--ink);
+  font:14.5px/1.85 var(--font-body);letter-spacing:.02em;
+  transition:border-color .25s,box-shadow .25s;
+}
+.ta:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.ta-foot{display:flex;align-items:center;margin-top:8px;gap:14px}
+.counter{font:11.5px var(--font-mono);color:var(--muted);letter-spacing:.08em}
+.counter b{color:var(--ink)}
+.counter.over b{color:var(--accent-hi)}
+.presets{margin-left:auto;display:flex;gap:6px}
+.pill{cursor:pointer;font:11.5px var(--font-body);color:var(--muted);border:1px solid var(--line);background:transparent;border-radius:999px;padding:4px 11px;transition:.2s}
+.pill:hover{color:var(--accent);border-color:var(--accent)}
+
+/* ============ 表达 / 情感 ============ */
+.switch{display:inline-flex;align-items:center;gap:11px;cursor:pointer;user-select:none}
+.switch input{display:none}
+.slider{width:40px;height:22px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line-strong);position:relative;transition:.25s;flex:none}
+.slider::after{content:"";position:absolute;top:2.5px;left:3px;width:15px;height:15px;border-radius:50%;background:var(--muted);transition:.25s cubic-bezier(.5,0,.2,1.4)}
+.switch input:checked+.slider{background:var(--accent-soft);border-color:var(--accent)}
+.switch input:checked+.slider::after{left:20px;background:var(--accent)}
+.switch .st{font:12px var(--font-mono);color:var(--muted);letter-spacing:.06em}
+.switch input:checked~.st{color:var(--accent-hi)}
+.emos{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;max-height:0;opacity:0;overflow:hidden;transition:max-height .45s ease,opacity .3s,margin .3s}
+.emos.on{max-height:260px;opacity:1;margin-top:16px}
+.emos.off-hint{margin-top:12px}
+.emo{
+  cursor:pointer;text-align:center;border:1px solid var(--line);border-radius:10px;
+  background:var(--panel-2);padding:10px 6px 8px;transition:.2s;color:var(--ink-soft);
+}
+.emo b{display:block;font-size:13.5px;font-weight:600}
+.emo small{font:10px var(--font-mono);color:var(--muted);letter-spacing:.05em}
+.emo:hover{border-color:var(--line-strong);transform:translateY(-1px)}
+.emo.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-hi);box-shadow:inset 0 0 0 1px var(--accent)}
+.emo.active small{color:var(--accent-hi)}
+
+/* ============ 生成按钮 ============ */
+.genwrap{padding:0}
+.gen{
+  position:relative;width:100%;height:52px;border:none;border-radius:12px;cursor:pointer;
+  font:15px var(--font-body);font-weight:700;letter-spacing:.22em;
+  color:#1d1608;background:linear-gradient(120deg,var(--accent-hi),var(--accent) 55%,var(--accent-hi));
+  background-size:200% 100%;
+  overflow:hidden;transition:.3s;
+}
+html[data-theme="dark"] .gen{color:#17130a;background:linear-gradient(120deg,var(--accent),var(--accent-hi) 55%,var(--accent))}
+.gen:hover{background-position:100% 0;transform:translateY(-1px);box-shadow:0 10px 26px -12px color-mix(in srgb,var(--accent) 60%,transparent)}
+.gen .fill{position:absolute;inset:0;width:0%;background:rgba(255,255,255,.28);pointer-events:none;transition:width .4s linear}
+.gen[disabled]{cursor:wait;transform:none;opacity:.92}
+.gen .lbl{position:relative;display:inline-flex;align-items:center;gap:10px}
+.spin{width:14px;height:14px;border:2px solid rgba(29,22,8,.35);border-top-color:#1d1608;border-radius:50%;animation:sp .7s linear infinite;display:none}
+.gen.busy .spin{display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+.prog{display:none;margin-top:14px}
+.prog.on{display:block}
+.prog .row{display:flex;justify-content:space-between;font:11.5px var(--font-mono);color:var(--muted);margin-bottom:6px}
+.prog .row b{color:var(--accent-hi)}
+.bar{height:5px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0%;background:repeating-linear-gradient(90deg,var(--accent) 0 6px,color-mix(in srgb,var(--accent) 55%,transparent) 6px 10px);transition:width .45s cubic-bezier(.3,.7,.3,1)}
+
+/* ============ 右栏 ============ */
+.rail-stack{position:sticky;top:92px;display:flex;flex-direction:column}
+/* 结果卡 */
+.result-empty{
+  border:1px dashed var(--line-strong);border-radius:12px;background:var(--panel-2);
+  padding:34px 16px;text-align:center;color:var(--muted);
+}
+.result-empty .note{font-size:30px;color:var(--line-strong);font-family:var(--font-display)}
+.result-empty b{display:block;font-size:13.5px;color:var(--ink-soft);margin-top:8px;letter-spacing:.15em;font-weight:600}
+.result-empty small{font-size:11.5px}
+/* 结果播放器 */
+.player{display:none;border:1px solid var(--line);border-radius:12px;background:var(--panel-2);padding:16px}
+.player.on{display:block;animation:rise .5s ease both}
+.player-top{display:flex;align-items:center;gap:13px}
+.pbtn{
+  width:44px;height:44px;flex:none;border-radius:50%;cursor:pointer;border:1.5px solid var(--accent);
+  background:var(--accent-soft);color:var(--accent-hi);font-size:15px;display:grid;place-items:center;transition:.2s;
+}
+.pbtn:hover{background:var(--accent);color:var(--bg)}
+.pmeta{font:11px var(--font-mono);color:var(--muted);letter-spacing:.06em}
+.pmeta b{display:block;font-size:13px;color:var(--ink);font-family:var(--font-display);letter-spacing:.03em}
+.bars{display:flex;align-items:flex-end;gap:3px;height:52px;margin-top:14px;padding:0 2px}
+.bars i{flex:1;border-radius:2px 2px 0 0;background:var(--line-strong);min-height:8%;transition:background .3s}
+.bars.seg{background:none}
+.bars i.cur{background:var(--accent)}
+.player.playing i.cur{animation:wv .9s ease-in-out infinite}
+.pseek{font:10.5px var(--font-mono);color:var(--muted);display:flex;justify-content:space-between;margin-top:4px}
+.pacts{display:flex;gap:8px;margin-top:14px}
+.pacts .minibtn{flex:1;text-align:center}
+/* 参数行 */
+.param{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px dashed var(--line);font-size:13px}
+.param:last-child{border-bottom:none}
+.param span{color:var(--muted)}
+.param b{font:12px var(--font-mono);color:var(--ink-soft);letter-spacing:.04em}
+.param b.g{color:var(--good)}
+.param b.a{color:var(--accent-hi)}
+
+/* toast */
+.toast{
+  position:fixed;left:50%;bottom:34px;transform:translate(-50%,20px);z-index:99;
+  background:var(--ink);color:var(--bg);font-size:13px;letter-spacing:.06em;
+  border-radius:999px;padding:9px 20px;opacity:0;pointer-events:none;transition:.3s;
+  box-shadow:0 12px 30px -12px rgba(0,0,0,.5);max-width:80vw;
+}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.reveal{animation:rise .5s cubic-bezier(.2,.7,.3,1) both}
+.reveal:nth-child(2){animation-delay:.07s}
+.reveal:nth-child(3){animation-delay:.14s}
+.reveal:nth-child(4){animation-delay:.21s}
+
+/* 页脚说明 */
+.proto-note{max-width:1440px;margin:0 auto;padding:0 60px;font:11px var(--font-mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+
+@media (max-width:1080px){
+  .shell{grid-template-columns:0px minmax(0,1fr);}
+  .rail{display:none}
+  .rail-stack{position:static;grid-column:2}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><b>AU<i>K</i></b><span>Studio</span></div>
+  <div class="crumb">工作台 <i>—</i> <em>声音克隆</em></div>
+  <div class="topright">
+    <div class="syschips">
+      <div class="chip"><span class="dot"></span>AuK-Flash <b>已就绪</b></div>
+      <div class="chip warn"><span class="dot"></span>显存 <b id="vramNum">3.2/8.0G</b></div>
+    </div>
+    <button class="themebtn" onclick="toggleTheme()"><span class="glyph" id="themeGlyph">☾</span><span id="themeLabel">深色</span></button>
+  </div>
+</header>
+
+<main class="shell">
+
+  <!-- 左侧标尺轨：标尺随生成进度下滑 -->
+  <aside class="rail" aria-hidden="true">
+    <div class="vtxt">Voice&nbsp;Clone&nbsp;·&nbsp;AuK-Flash</div>
+    <div class="ticks" id="railTicks"></div>
+    <div class="gold">◆</div>
+  </aside>
+
+  <!-- 主工作列 -->
+  <section>
+    <!-- 01 参考音频 -->
+    <div class="card reveal">
+      <div class="card-hd">
+        <div class="stepno">01</div>
+        <div class="t">参考音频<small>Reference Audio</small></div>
+        <div class="tail"><span class="badge gold">必填</span></div>
+      </div>
+      <div class="card-bd">
+        <div class="drop" id="drop" onclick="pickFile()">
+          <div class="up"><i>↑</i>点击或拖入参考音频</div>
+          <div class="sub">WAV · MP3 · FLAC · M4A — 建议 5~15 秒干净人声 — 最大 100 MB</div>
+        </div>
+        <input type="file" id="file" accept="audio/*" class="hiddenfile" style="display:none">
+        <div class="filechip" id="filechip">
+          <div class="fic">♫</div>
+          <div class="meta"><b id="fName">demo.wav</b><small id="fInfo">— · —</small></div>
+          <div class="wave" id="fWave"></div>
+          <button class="minibtn" onclick="togglePreview(event)" id="prevBtn">试听</button>
+          <button class="minibtn" onclick="clearFile(event)">移除</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 02 目标文本 -->
+    <div class="card reveal">
+      <div class="card-hd">
+        <div class="stepno">02</div>
+        <div class="t">目标文本<small>Target Text</small></div>
+        <div class="tail"><span class="badge" id="durBadge">预计时长 ≈ 6.5 s</span></div>
+      </div>
+      <div class="card-bd">
+        <textarea class="ta" id="text">欢迎来到 AuK Studio。现在，让这段声音自然地说出你想表达的每一句话。</textarea>
+        <div class="ta-foot">
+          <div class="counter" id="counter"><b>0</b> 字 · 建议 ≤ 200 字</div>
+          <div class="presets">
+            <button class="pill" onclick="sample('日常')">日常</button>
+            <button class="pill" onclick="sample('播报')">播报</button>
+            <button class="pill" onclick="sample('旁白')">旁白</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 03 表达控制 -->
+    <div class="card reveal">
+      <div class="card-hd">
+        <div class="stepno">03</div>
+        <div class="t">表达控制<small>Expression</small></div>
+        <div class="tail">
+          <label class="switch">
+            <input type="checkbox" id="emoToggle" onchange="emoSwitched()">
+            <span class="slider"></span>
+            <span class="st" id="emoState">关 · 仅克隆音色</span>
+          </label>
+        </div>
+      </div>
+      <div class="card-bd">
+        <div class="emos" id="emos">
+          <div class="emo active" data-e="happy"><b>开心</b><small>happy</small></div>
+          <div class="emo" data-e="angry"><b>愤怒</b><small>angry</small></div>
+          <div class="emo" data-e="sad"><b>悲伤</b><small>sad</small></div>
+          <div class="emo" data-e="fearful"><b>恐惧</b><small>fearful</small></div>
+          <div class="emo" data-e="surprised"><b>惊讶</b><small>surprised</small></div>
+          <div class="emo" data-e="disgusted"><b>厌恶</b><small>disgusted</small></div>
+          <div class="emo" data-e="calm"><b>平静</b><small>calm</small></div>
+          <div class="emo" data-e="excited"><b>兴奋</b><small>excited</small></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 04 生成 -->
+    <div class="card reveal">
+      <div class="card-hd">
+        <div class="stepno">04</div>
+        <div class="t">生成<small>Generate</small></div>
+        <div class="tail"><span class="badge">8GB 分页 Offload</span></div>
+      </div>
+      <div class="card-bd genwrap">
+        <button class="gen" id="genBtn" onclick="generate()">
+          <span class="fill" id="genFill"></span>
+          <span class="lbl"><span class="spin"></span><span id="genLbl">✦ 开 始 生 成</span></span>
+        </button>
+        <div class="prog" id="prog">
+          <div class="row"><span id="progText">正在加载模型…</span><b id="progPct">0%</b></div>
+          <div class="bar"><i id="progBar"></i></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 右栏 -->
+  <aside class="rail-stack">
+    <div class="card reveal">
+      <div class="card-hd">
+        <div class="stepno">◎</div>
+        <div class="t">生成结果<small>Result</small></div>
+        <div class="tail"><span class="badge" id="rBadge">待机</span></div>
+      </div>
+      <div class="card-bd">
+        <div class="result-empty" id="rEmpty">
+          <div class="note">♫</div>
+          <b>等待生成</b>
+          <small>完成后在这里试听、下载，并可存入历史</small>
+        </div>
+        <div class="player" id="rPlayer">
+          <div class="player-top">
+            <button class="pbtn" id="pBtn" onclick="toggleResultPlay()">▶</button>
+            <div class="pmeta"><b id="rName">clone_result.wav</b><span id="rSize">— · 24 kHz · WAV</span></div>
+          </div>
+          <div class="bars" id="rBars"></div>
+          <div class="pseek"><span>0:00</span><span id="rDur">0:07</span></div>
+          <div class="pacts">
+            <button class="minibtn" onclick="toast('原型演示：下载为占位功能')">↓ 下载</button>
+            <button class="minibtn" onclick="toast('原型演示：可在此接入 A/B 对比原音')">对比原音</button>
+            <button class="minibtn" onclick="toast('原型演示：存入历史')">存入历史</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card reveal">
+      <div class="card-hd">
+        <div class="stepno">⌕</div>
+        <div class="t">任务信息<small>Task Info</small></div>
+      </div>
+      <div class="card-bd">
+        <div class="param"><span>模型</span><b>AuK-Flash</b></div>
+        <div class="param"><span>显存策略</span><b class="a">分页 Offload · 8GB</b></div>
+        <div class="param"><span>输出</span><b>WAV · 24 kHz</b></div>
+        <div class="param"><span>时长模式</span><b id="tiDur">按文本估算</b></div>
+        <div class="param"><span>上次耗时</span><b class="g" id="tiLast">—</b></div>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<footer class="proto-note">AuK Studio · 声音克隆页重构原型 · 单文件零依赖 · 交互为演示占位</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- 主题 ---------- */
+function applyTheme(t){
+  document.documentElement.dataset.theme=t;
+  document.getElementById('themeGlyph').textContent=t==='light'?'☾':'☀';
+  document.getElementById('themeLabel').textContent=t==='light'?'深色':'浅色';
+}
+function toggleTheme(){
+  const t=document.documentElement.dataset.theme==='light'?'dark':'light';
+  applyTheme(t);try{localStorage.setItem('auk-proto-theme',t)}catch(e){}
+}
+(function(){let t='light';try{t=localStorage.getItem('auk-proto-theme')||'light'}catch(e){}applyTheme(t)})();
+
+/* ---------- 小工具 ---------- */
+const $=id=>document.getElementById(id);
+let toastTimer;
+function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('on');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('on'),2400)}
+
+/* ---------- 01 参考音频 ---------- */
+function buildWave(el,n){el.innerHTML='';for(let i=0;i<n;i++){const b=document.createElement('i');b.style.height=(18+Math.abs(Math.sin(i*1.7))*70)+'%';b.style.animationDelay=(i*0.06)+'s';el.appendChild(b)}}
+buildWave($('fWave'),16);
+let fileReady=false;
+function pickFile(){$('file').click()}
+$('drop').addEventListener('dragover',e=>{e.preventDefault();$('drop').classList.add('over')});
+$('drop').addEventListener('dragleave',()=>$('drop').classList.remove('over'));
+$('drop').addEventListener('drop',e=>{e.preventDefault();$('drop').classList.remove('over');if(e.dataTransfer.files[0])setFile(e.dataTransfer.files[0])});
+$('file').addEventListener('change',e=>{if(e.target.files[0])setFile(e.target.files[0])});
+function setFile(f){
+  fileReady=true;
+  $('fName').textContent=f.name;
+  $('fInfo').textContent=(f.size/1024/1024).toFixed(2)+' MB · 已本地解析';
+  $('filechip').classList.add('on');
+  $('drop').style.display='none';
+}
+function clearFile(e){
+  e.stopPropagation();fileReady=false;$('file').value='';
+  $('filechip').classList.remove('on');$('drop').style.display='';
+  $('prevBtn').textContent='试听';$('fWave').classList.remove('playing');
+}
+function togglePreview(e){
+  e.stopPropagation();
+  const w=$('fWave'),on=!w.classList.contains('playing');
+  w.classList.toggle('playing',on);$('prevBtn').textContent=on?'暂停':'试听';
+}
+
+/* ---------- 02 文本 ---------- */
+const SPEED_CPS=4.2; /* 近似中文每秒字数 */
+function syncText(){
+  const v=$('text').value.trim(),n=[...$('text').value].length;
+  const c=$('counter');c.querySelector('b').textContent=n;
+  c.classList.toggle('over',n>200);
+  const est=v?Math.max(1,Math.round(v.length/SPEED_CPS*10)/10):0;
+  $('durBadge').textContent=est?('预计时长 ≈ '+est+' s'):'预计时长 —';
+  $('tiDur').textContent=est?('文本估算 · '+est+' s'):'按文本估算';
+}
+$('text').addEventListener('input',syncText);syncText();
+const SAMPLES={
+  '日常':'今天天气真好，我们一起出去走走吧，顺便把上周说的那家店打卡了。',
+  '播报':'下面播报一则消息：本市轨道交通新线路将于下月一日正式开通运营。',
+  '旁白':'那一年他离开故乡，身后是连绵的群山，眼前是望不见尽头城市灯火。'
+};
+function sample(k){$('text').value=SAMPLES[k];syncText();toast('已填入「'+k+'」示例文本')}
+
+/* ---------- 03 情感 ---------- */
+function emoSwitched(){
+  const on=$('emoToggle').checked;
+  $('emos').classList.toggle('on',on);
+  $('emos').classList.toggle('off-hint',!on);
+  $('emoState').textContent=on?'开 · 叠加情绪表达':'关 · 仅克隆音色';
+}
+$('emos').addEventListener('click',e=>{
+  const el=e.target.closest('.emo');if(!el)return;
+  document.querySelectorAll('.emo').forEach(x=>x.classList.remove('active'));
+  el.classList.add('active');
+});
+
+/* ---------- 04 生成（演示流程） ---------- */
+let busy=false;
+const STAGES=[[12,'正在加载模型…'],[30,'编码参考音频…'],[78,'声学生成中…'],[94,'VAE 解码…'],[100,'完成']];
+function generate(){
+  if(busy)return;
+  if(!fileReady)return toast('请先上传参考音频');
+  if(!$('text').value.trim())return toast('请填写目标文本');
+  /* 点击即刻同步变状态 */
+  busy=true;
+  const btn=$('genBtn');btn.disabled=true;btn.classList.add('busy');
+  $('genLbl').textContent='生成中，请稍候…';
+  $('rBadge').textContent='生成中';$('rBadge').classList.add('gold');
+  $('rEmpty').style.display='none';$('rPlayer').classList.remove('on');
+  $('prog').classList.add('on');
+  let si=0,pct=0;
+  const tick=()=>{
+    const target=STAGES[si][0];
+    pct=Math.min(target,pct+1.6+Math.random()*2.4);
+    $('progBar').style.width=pct+'%';
+    $('progPct').textContent=Math.round(pct)+'%';
+    $('progText').textContent=STAGES[si][1];
+    $('genFill').style.width=pct+'%';
+    setRail(pct);
+    if(pct>=target&&si<STAGES.length-1)si++;
+    if(pct>=100){finish();return}
+    setTimeout(tick,90);
+  };
+  setTimeout(tick,250);
+}
+function setRail(p){
+  $('railTicks').style.setProperty('--tick',p+'%');
+}
+function finish(){
+  setTimeout(()=>{
+    busy=false;
+    const btn=$('genBtn');btn.disabled=false;btn.classList.remove('busy');
+    $('genLbl').textContent='✦ 开 始 生 成';
+    $('genFill').style.width='0%';
+    $('prog').classList.remove('on');
+    $('rBadge').textContent='完成';$('rBadge').classList.remove('gold');
+    const dur=Math.max(1,Math.round($('text').value.trim().length/SPEED_CPS));
+    $('rName').textContent='clone_'+Date.now().toString(36)+'.wav';
+    $('rSize').textContent=(0.3+dur*0.05).toFixed(1)+' MB · 24 kHz · WAV';
+    $('rDur').textContent='0:'+String(dur).padStart(2,'0');
+    $('tiLast').textContent=dur+' s 音频 · 约 '+Math.round(dur*2.2)+' s';
+    $('rPlayer').classList.add('on');
+    buildResultBars();
+    toast('生成完成（原型演示）');
+  },500);
+}
+function buildResultBars(){
+  const el=$('rBars');el.innerHTML='';
+  const N=42;
+  for(let i=0;i<N;i++){
+    const b=document.createElement('i');
+    b.style.height=(14+Math.abs(Math.sin(i*0.9)+Math.sin(i*0.33))*38)+'%';
+    el.appendChild(b);
+  }
+}
+let playing=false,playIdx=0,playTimer;
+function toggleResultPlay(){
+  playing=!playing;
+  $('pBtn').textContent=playing?'❚❚':'▶';
+  $('rPlayer').classList.toggle('playing',playing);
+  if(playing){
+    playIdx=0;
+    const bars=$('rBars').children;
+    const step=()=>{
+      if(!playing)return;
+      for(let i=0;i<bars.length;i++)bars[i].classList.toggle('cur',i<=playIdx);
+      playIdx++;
+      if(playIdx>bars.length){toggleResultPlay();playIdx=0;for(let i=0;i<bars.length;i++)bars[i].classList.remove('cur');return}
+      playTimer=setTimeout(step,140);
+    };
+    step();
+  }else{clearTimeout(playTimer)}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AuK Studio · 声音克隆 v2</title>
+<style>
+:root{
+  --font-ui:-apple-system,"PingFang SC","Microsoft YaHei UI","Segoe UI",sans-serif;
+  --font-mono:"Consolas","Menlo",monospace;
+}
+html[data-theme="light"]{
+  --bg:#f6f4ee;
+  --panel:#fdfcf8;
+  --panel-2:#f1eee5;
+  --line:#e0dccf;
+  --line-strong:#c8c2b0;
+  --ink:#26231c;
+  --muted:#8a8375;
+  --accent:#a07718;
+  --accent-soft:rgba(160,119,24,.1);
+  --good:#3e7a4e;
+}
+html[data-theme="dark"]{
+  --bg:#141518;
+  --panel:#1c1e22;
+  --panel-2:#23262b;
+  --line:#32363d;
+  --line-strong:#484e57;
+  --ink:#eceef2;
+  --muted:#949ba5;
+  --accent:#e2b25a;
+  --accent-soft:rgba(226,178,90,.12);
+  --good:#7fc98f;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  min-height:100vh;background:var(--bg);color:var(--ink);
+  font:14px/1.7 var(--font-ui);
+  transition:background .3s,color .3s;
+}
+.hidden{display:none!important}
+
+/* 顶栏 */
+.topbar{
+  display:flex;align-items:center;gap:16px;
+  height:54px;padding:0 28px;
+  border-bottom:1px solid var(--line);
+  background:var(--panel);
+}
+.brand{font:600 15px var(--font-mono);letter-spacing:.05em}
+.brand i{font-style:normal;color:var(--accent)}
+.crumb{font-size:13px;color:var(--muted)}
+.topright{margin-left:auto;display:flex;align-items:center;gap:12px}
+.status{font:12px var(--font-mono);color:var(--muted);display:flex;align-items:center;gap:7px}
+.status .dot{width:6px;height:6px;border-radius:50%;background:var(--good)}
+.themebtn{
+  cursor:pointer;border:1px solid var(--line-strong);background:transparent;color:var(--ink);
+  border-radius:8px;padding:5px 12px;font:12.5px var(--font-ui);
+}
+.themebtn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* 布局 */
+.page{max-width:1120px;margin:0 auto;padding:32px 28px 72px;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:24px;align-items:start}
+
+/* 卡片 */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+.card+.card{margin-top:16px}
+.card-hd{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.card-hd .num{font:12px var(--font-mono);color:var(--accent);border:1px solid var(--accent-soft);background:var(--accent-soft);border-radius:5px;padding:1px 7px}
+.card-hd h2{font-size:14.5px;font-weight:650}
+.card-hd .tail{margin-left:auto;display:flex;align-items:center;gap:8px}
+.badge{font:11.5px var(--font-mono);color:var(--muted)}
+.badge.gold{color:var(--accent)}
+
+/* 上传 */
+.drop{
+  border:1px dashed var(--line-strong);border-radius:8px;
+  padding:24px 16px;text-align:center;cursor:pointer;
+  background:var(--panel-2);transition:border-color .2s;
+}
+.drop:hover,.drop.over{border-color:var(--accent)}
+.drop b{font-weight:600;font-size:13.5px}
+.drop small{display:block;margin-top:4px;font:11.5px var(--font-mono);color:var(--muted)}
+.filechip{display:none;align-items:center;gap:10px;margin-top:12px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);padding:10px 12px}
+.filechip.on{display:flex}
+.filechip .meta{flex:1;min-width:0}
+.filechip .meta b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.filechip .meta small{font:11px var(--font-mono);color:var(--muted)}
+
+/* 表单控件 */
+.ta{
+  width:100%;min-height:104px;resize:vertical;
+  background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+  padding:11px 13px;color:var(--ink);font:14px/1.8 var(--font-ui);
+}
+.ta:focus{outline:none;border-color:var(--accent)}
+.ta-foot{display:flex;margin-top:6px;align-items:center}
+.counter{font:11.5px var(--font-mono);color:var(--muted)}
+.counter.over{color:var(--accent)}
+.presets{margin-left:auto;display:flex;gap:6px}
+.pill{cursor:pointer;font:12px var(--font-ui);color:var(--muted);border:1px solid var(--line);background:transparent;border-radius:6px;padding:3px 10px}
+.pill:hover{color:var(--accent);border-color:var(--accent)}
+
+/* 情感 */
+.switch{display:inline-flex;align-items:center;gap:9px;cursor:pointer;user-select:none}
+.switch input{display:none}
+.slider{width:34px;height:19px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line-strong);position:relative;transition:.2s;flex:none}
+.slider::after{content:"";position:absolute;top:2px;left:3px;width:13px;height:13px;border-radius:50%;background:var(--muted);transition:.2s}
+.switch input:checked+.slider{border-color:var(--accent)}
+.switch input:checked+.slider::after{left:16px;background:var(--accent)}
+.switch .st{font:12px var(--font-mono);color:var(--muted)}
+.emos{display:none;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+.emos.on{display:grid}
+.emo{cursor:pointer;text-align:center;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);padding:8px 4px 6px}
+.emo b{display:block;font-size:13px;font-weight:600}
+.emo small{font:10.5px var(--font-mono);color:var(--muted)}
+.emo.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.emo.active small{color:var(--accent)}
+
+/* 按钮与进度 */
+.gen{
+  width:100%;height:42px;border:none;border-radius:8px;cursor:pointer;
+  font:600 14px var(--font-ui);letter-spacing:.08em;
+  background:var(--accent);color:var(--bg);transition:opacity .2s;
+}
+.gen:hover{opacity:.88}
+.gen[disabled]{cursor:wait;opacity:.65}
+.prog{display:none;margin-top:12px}
+.prog.on{display:block}
+.prog .row{display:flex;justify-content:space-between;font:11.5px var(--font-mono);color:var(--muted);margin-bottom:5px}
+.bar{height:4px;border-radius:99px;background:var(--panel-2);border:1px solid var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0%;background:var(--accent);transition:width .4s linear}
+
+/* 结果 */
+.result-empty{border:1px dashed var(--line-strong);border-radius:8px;padding:28px 14px;text-align:center;color:var(--muted);font-size:13px}
+.player{display:none;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);padding:14px}
+.player.on{display:block}
+.player-top{display:flex;align-items:center;gap:11px}
+.pbtn{width:36px;height:36px;flex:none;border-radius:50%;cursor:pointer;border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent);font-size:13px;display:grid;place-items:center}
+.pmeta{font:11px var(--font-mono);color:var(--muted);min-width:0}
+.pmeta b{display:block;font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bars{display:flex;align-items:flex-end;gap:2px;height:40px;margin-top:12px}
+.bars i{flex:1;border-radius:1px;background:var(--line-strong);min-height:10%}
+.bars i.cur{background:var(--accent)}
+.pacts{display:flex;gap:8px;margin-top:12px}
+.pacts .pill{flex:1;text-align:center;padding:6px 0}
+.param{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+.param:last-child{border-bottom:none}
+.param span{color:var(--muted)}
+.param b{font:12px var(--font-mono);font-weight:500}
+
+.toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,12px);background:var(--ink);color:var(--bg);font-size:12.5px;border-radius:8px;padding:8px 16px;opacity:0;pointer-events:none;transition:.25s;z-index:99}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:900px){.page{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">AU<i>K</i> Studio</div>
+  <div class="crumb">声音克隆</div>
+  <div class="topright">
+    <span class="status"><span class="dot"></span><span id="modelState">AuK-Flash · 按需加载</span></span>
+    <button class="themebtn" onclick="toggleTheme()" id="themeBtn">深色</button>
+  </div>
+</header>
+
+<main class="page">
+  <section>
+    <div class="card">
+      <div class="card-hd"><span class="num">01</span><h2>参考音频</h2><div class="tail"><span class="badge gold">必填</span></div></div>
+      <div class="drop" id="drop"><b>点击或拖入音频</b><small>WAV / MP3 / FLAC / M4A · 建议 5~15 秒 · 最大 100 MB</small></div>
+      <input type="file" id="file" accept="audio/*" class="hidden">
+      <div class="filechip" id="filechip">
+        <div class="meta"><b id="fName">—</b><small id="fInfo">—</small></div>
+        <button class="pill" onclick="clearFile(event)">移除</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><span class="num">02</span><h2>目标文本</h2><div class="tail"><span class="badge" id="durBadge"></span></div></div>
+      <textarea class="ta" id="text">欢迎来到 AuK Studio。现在，让这段声音自然地说出你想表达的每一句话。</textarea>
+      <div class="ta-foot">
+        <span class="counter" id="counter">0 字</span>
+        <div class="presets">
+          <button class="pill" onclick="sample('日常')">日常</button>
+          <button class="pill" onclick="sample('播报')">播报</button>
+          <button class="pill" onclick="sample('旁白')">旁白</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><span class="num">03</span><h2>表达控制</h2>
+        <div class="tail">
+          <label class="switch"><input type="checkbox" id="emoToggle" onchange="emoSwitched()"><span class="slider"></span><span class="st" id="emoState">关 · 仅克隆</span></label>
+        </div>
+      </div>
+      <div class="emos" id="emos">
+        <div class="emo active" data-e="happy"><b>开心</b><small>happy</small></div>
+        <div class="emo" data-e="angry"><b>愤怒</b><small>angry</small></div>
+        <div class="emo" data-e="sad"><b>悲伤</b><small>sad</small></div>
+        <div class="emo" data-e="fearful"><b>恐惧</b><small>fearful</small></div>
+        <div class="emo" data-e="surprised"><b>惊讶</b><small>surprised</small></div>
+        <div class="emo" data-e="disgusted"><b>厌恶</b><small>disgusted</small></div>
+        <div class="emo" data-e="calm"><b>平静</b><small>calm</small></div>
+        <div class="emo" data-e="excited"><b>兴奋</b><small>excited</small></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><span class="num">04</span><h2>生成</h2><div class="tail"><span class="badge">8GB · 分页 Offload</span></div></div>
+      <button class="gen" id="genBtn" onclick="generate()">开始生成</button>
+      <div class="prog" id="prog">
+        <div class="row"><span id="progText"></span><span id="progPct">0%</span></div>
+        <div class="bar"><i id="progBar"></i></div>
+      </div>
+    </div>
+  </section>
+
+  <aside>
+    <div class="card">
+      <div class="card-hd"><h2>生成结果</h2><div class="tail"><span class="badge" id="rBadge">待机</span></div></div>
+      <div class="result-empty" id="rEmpty">等待生成，完成后在这里试听和下载</div>
+      <div class="player" id="rPlayer">
+        <div class="player-top">
+          <button class="pbtn" id="pBtn" onclick="togglePlay()">▶</button>
+          <div class="pmeta"><b id="rName">—</b><span id="rSize">—</span></div>
+        </div>
+        <div class="bars" id="rBars"></div>
+        <div class="pacts">
+          <button class="pill" onclick="toast('原型演示：下载为占位')">下载</button>
+          <button class="pill" onclick="toast('原型演示：A/B 对比占位')">对比原音</button>
+          <button class="pill" onclick="toast('原型演示：存历史占位')">存入历史</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><h2>任务信息</h2></div>
+      <div class="param"><span>模型</span><b>AuK-Flash</b></div>
+      <div class="param"><span>显存策略</span><b>分页 Offload</b></div>
+      <div class="param"><span>输出</span><b>WAV · 24 kHz</b></div>
+      <div class="param"><span>时长</span><b id="tiDur">按文本估算</b></div>
+    </div>
+  </aside>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function applyTheme(t){
+  document.documentElement.dataset.theme=t;
+  document.getElementById('themeBtn').textContent=t==='light'?'深色':'浅色';
+}
+function toggleTheme(){
+  applyTheme(document.documentElement.dataset.theme==='light'?'dark':'light');
+  try{localStorage.setItem('auk-proto2-theme',document.documentElement.dataset.theme)}catch(e){}
+}
+(function(){let t='light';try{t=localStorage.getItem('auk-proto2-theme')||'light'}catch(e){}applyTheme(t)})();
+
+const $=id=>document.getElementById(id);
+let toastTimer;
+function toast(m){const el=$('toast');el.textContent=m;el.classList.add('on');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('on'),2200)}
+
+let fileReady=false;
+$('drop').onclick=()=>$('file').click();
+$('drop').addEventListener('dragover',e=>{e.preventDefault();$('drop').classList.add('over')});
+$('drop').addEventListener('dragleave',()=>$('drop').classList.remove('over'));
+$('drop').addEventListener('drop',e=>{e.preventDefault();$('drop').classList.remove('over');if(e.dataTransfer.files[0])setFile(e.dataTransfer.files[0])});
+$('file').addEventListener('change',e=>{if(e.target.files[0])setFile(e.target.files[0])});
+function setFile(f){
+  fileReady=true;
+  $('fName').textContent=f.name;
+  $('fInfo').textContent=(f.size/1024/1024).toFixed(2)+' MB';
+  $('filechip').classList.add('on');$('drop').classList.add('hidden');
+}
+function clearFile(e){e.stopPropagation();fileReady=false;$('file').value='';$('filechip').classList.remove('on');$('drop').classList.remove('hidden')}
+
+const CPS=4.2;
+function syncText(){
+  const v=$('text').value,n=[...v].length;
+  $('counter').textContent=n+' 字 · ≤200';
+  $('counter').classList.toggle('over',n>200);
+  const est=v.trim()?Math.max(1,Math.round(v.trim().length/CPS*10)/10):0;
+  $('durBadge').textContent=est?('预计时长 ≈ '+est+' s'):'预计时长 —';
+}
+$('text').addEventListener('input',syncText);syncText();
+const SAMPLES={'日常':'今天天气真好，我们一起出去走走吧，顺便把上周说的那家店打卡了。','播报':'下面播报一则消息：本市轨道交通新线路将于下月一日正式开通运营。','旁白':'那一年他离开故乡，身后是连绵的群山，眼前是望不见尽头城市灯火。'};
+function sample(k){$('text').value=SAMPLES[k];syncText()}
+
+function emoSwitched(){
+  const on=$('emoToggle').checked;
+  $('emos').classList.toggle('on',on);
+  $('emoState').textContent=on?'开 · 叠加情绪':'关 · 仅克隆';
+}
+$('emos').addEventListener('click',e=>{
+  const el=e.target.closest('.emo');if(!el)return;
+  document.querySelectorAll('.emo').forEach(x=>x.classList.remove('active'));
+  el.classList.add('active');
+});
+
+let busy=false;
+const STAGES=[[12,'正在加载模型…'],[30,'编码参考音频…'],[78,'声学生成中…'],[94,'VAE 解码…'],[100,'完成']];
+function generate(){
+  if(busy)return;
+  if(!fileReady)return toast('请先上传参考音频');
+  if(!$('text').value.trim())return toast('请填写目标文本');
+  busy=true;
+  const btn=$('genBtn');btn.disabled=true;btn.textContent='生成中…';
+  $('rBadge').textContent='生成中';
+  $('rEmpty').classList.add('hidden');$('rPlayer').classList.remove('on');
+  $('prog').classList.add('on');
+  let si=0,pct=0;
+  const tick=()=>{
+    const target=STAGES[si][0];
+    pct=Math.min(target,pct+2+Math.random()*3);
+    $('progBar').style.width=pct+'%';
+    $('progPct').textContent=Math.round(pct)+'%';
+    $('progText').textContent=STAGES[si][1];
+    if(pct>=target&&si<STAGES.length-1)si++;
+    if(pct>=100){finish();return}
+    setTimeout(tick,90);
+  };
+  setTimeout(tick,200);
+}
+function finish(){
+  setTimeout(()=>{
+    busy=false;
+    const btn=$('genBtn');btn.disabled=false;btn.textContent='开始生成';
+    $('prog').classList.remove('on');$('progBar').style.width='0%';
+    $('rBadge').textContent='完成';
+    const dur=Math.max(1,Math.round($('text').value.trim().length/CPS));
+    $('rName').textContent='clone_'+Date.now().toString(36)+'.wav';
+    $('rSize').textContent=(0.3+dur*0.05).toFixed(1)+' MB · 24 kHz · WAV';
+    $('tiDur').textContent='≈ '+dur+' s';
+    $('rPlayer').classList.add('on');
+    const el=$('rBars');el.innerHTML='';
+    for(let i=0;i<40;i++){const b=document.createElement('i');b.style.height=(16+Math.abs(Math.sin(i*0.9)+Math.sin(i*0.33))*36)+'%';el.appendChild(b)}
+    toast('生成完成（原型演示）');
+  },400);
+}
+let playing=false,pIdx=0,pTimer;
+function togglePlay(){
+  playing=!playing;
+  $('pBtn').textContent=playing?'❚❚':'▶';
+  if(playing){
+    pIdx=0;
+    const bars=$('rBars').children;
+    const step=()=>{
+      if(!playing)return;
+      for(let i=0;i<bars.length;i++)bars[i].classList.toggle('cur',i<=pIdx);
+      pIdx++;
+      if(pIdx>bars.length){playing=false;$('pBtn').textContent='▶';for(let i=0;i<bars.length;i++)bars[i].classList.remove('cur');return}
+      pTimer=setTimeout(step,150);
+    };
+    step();
+  }else clearTimeout(pTimer);
+}
+</script>
+</body>
+</html>
