@@ -55,5 +55,14 @@ AGENTS.md
 outputs/
 uploads/
 
+# local-only archive and internal reports: kept on disk for us, not published
+design-prototypes/
+docs/TASK_OPTIMIZATION.md
+docs/CODE_AUDIT_*.md
+
+# verification scratch: probe scripts and the test audio they generate
+.tmp-longtext/
+audition-longtext/
+
 # per-process rotating logs (launcher.log / server.log / worker.log)
 logs/

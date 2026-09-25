@@ -29,6 +29,11 @@ ROOT = Path(__file__).resolve().parents[1]
 UPLOAD_DIR = ROOT / "uploads"
 OUTPUT_DIR = ROOT / "outputs"
 FRONTEND_DIR = ROOT / "frontend"
+# The page's 51 demo cases play their reference clips from here. The library owns this
+# directory (infer_gradio.py reads the same files); it is served under /demo-audio instead
+# of being copied into frontend/, because two copies drift: the official one can be updated
+# while the page keeps playing the stale one, and nothing notices.
+DEMO_AUDIO_DIR = ROOT / "assets" / "demo-input-audio"
 # When this file was last edited. The launcher compares it against the value the running
 # server reports, so "an instance is already on the port" can be answered either as
 # "fine, here is your page" or as "that instance is stale, stop it first".
@@ -1726,4 +1731,7 @@ async def client_log(request: Request):
     return {"ok": True}
 
 
+# Registered before the catch-all below: Starlette matches routes in registration order, so
+# a mount added after "/" would never see a request.
+app.mount("/demo-audio", StaticFiles(directory=DEMO_AUDIO_DIR), name="demo-audio")
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

@@ -523,7 +523,7 @@ function addHistory(type,x){const a=JSON.parse(localStorage.getItem(historyKey)|
 let histData=[],_histUrl={},_histSeq={};
 async function histPlay(i,btn){const box=$('histPlay-'+i);if(!box)return;const _s=_histSeq[i]=(_histSeq[i]||0)+1;if(box.classList.contains('hidden')){box.classList.remove('hidden');btn.textContent='收起';try{const r=await fetch(histData[i].url);if(!r.ok)throw Error();const b=await r.blob();const x=await probeAudio(b);if(_s!==_histSeq[i])return;if(_histUrl[i])URL.revokeObjectURL(_histUrl[i]);_histUrl[i]=URL.createObjectURL(b);showInputPlay('histPlay-'+i,_histUrl[i],x.peaks)}catch(e){if(_s!==_histSeq[i])return;box.classList.add('hidden');btn.textContent='试听';toast('音频文件已不在服务器')}}else{if(_histUrl[i]){URL.revokeObjectURL(_histUrl[i]);delete _histUrl[i]}hideInputPlay('histPlay-'+i);btn.textContent='试听'}}function clearHistory(){localStorage.removeItem(historyKey);renderHistory();toast('历史记录已清空')}
 // ===== 官方案例（infer_gradio.py DEMO_EXAMPLE_GROUPS 逐字移植）=====
-// 每个案例 = 参考音频(经 frontend/demo-audio/ 静态目录) + 该页全部参数。载入后点生成即复现官方 demo 效果。
+// 每个案例 = 参考音频(官方素材在 assets/demo-input-audio，后端挂在 /demo-audio) + 该页全部参数。载入后点生成即复现官方 demo 效果。
 const DEMO_AUDIO='demo-audio/';
 const OFFICIAL_DEMOS={
 clone:{input:'cloneFile',layout:'btn',cases:[
