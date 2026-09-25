@@ -81,7 +81,7 @@ Record any deviation from the dependencies declared in `pyproject.toml` in the
 pull request.
 
 The application downloads model assets at runtime. Follow the environment and
-repository-access instructions in [README.md](README.md), and keep credentials
+repository-access instructions in [docs/AuK-MODEL.md](AuK-MODEL.md), and keep credentials
 in environment variables or repository secrets. Credentials must never be
 committed to the repository.
 

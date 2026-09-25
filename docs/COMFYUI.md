@@ -1,9 +1,9 @@
 # AuK in ComfyUI
 
 AuK and AuK-Flash use the same models, Prompt Enhancer (PE), and task
-instructions as the [Gradio demo](../README.md#interactive-gradio-demo).
-Follow the README for [installation](../README.md#installation),
-[weights](../README.md#download-the-weights), and PE configuration; use the
+instructions as the [Gradio demo](AuK-MODEL.md#interactive-gradio-demo).
+Follow the model documentation for [installation](AuK-MODEL.md#installation),
+[weights](AuK-MODEL.md#download-the-weights), and PE configuration; use the
 [Cookbook](COOKBOOK.md) for task examples.
 
 ## Connect to ComfyUI

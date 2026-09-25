@@ -2,7 +2,7 @@
 
 AuK fine-tuning uses the same ChatML-style multimodal conditioning format as inference. Each training sample contains a natural-language instruction, optional reference audio, and a target audio.
 
-This guide covers data preparation, training, checkpointing, and inference with a fine-tuned model. For a minimal example, see the [Fine-tuning](../README.md#fine-tuning) section of the README.
+This guide covers data preparation, training, checkpointing, and inference with a fine-tuned model. For a minimal example, see the [Fine-tuning](AuK-MODEL.md#fine-tuning) section of the model documentation.
 
 ## Contents
 

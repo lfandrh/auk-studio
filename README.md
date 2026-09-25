@@ -1,705 +1,61 @@
-<div align="center">
+# AuK Studio
 
-# AuK: An Open-Source Foundational Model for Speech Generation and Editing
+本地运行 AuK / AuK-Flash 的语音生成与编辑工作台：FastAPI 后端 + 单文件前端 + 独立模型子进程，双击批处理即可使用，不依赖 Gradio。
 
-</div>
+包名：`auk-studio`（分发包 / 仓库名）。导入包名仍是 `auk`（`src/auk/`），两者不是一回事。
 
-<div align="center">
-  <a href=https://auk-project.github.io/ target="_blank"><img src=https://img.shields.io/badge/%F0%9F%8C%90%20Website-AuK-1a73e8.svg height=22px></a>
-  <a href=https://arxiv.org/abs/2609.08936 target="_blank"><img src=https://img.shields.io/badge/Report-b5212f.svg?logo=arxiv height=22px></a>
-  <a href=https://huggingface.co/spaces/tencent/AuK target="_blank"><img src=https://img.shields.io/badge/%F0%9F%A4%97%20HuggingFace-Demo%20Space-ffbd45.svg height=22px></a>
-  <a href=https://modelscope.cn/studios/Tencent-Hunyuan/AuK target="_blank"><img src=https://img.shields.io/badge/%F0%9F%A4%96%20ModelScope-Demo%20Space-624aff.svg height=22px></a>
-</div>
+上游模型本身的文档（论文介绍、基准、权重下载、CLI / Gradio / ComfyUI / Python API、微调）已迁到 [docs/AuK-MODEL.md](docs/AuK-MODEL.md)。本仓库自带 `src/auk/`，**不需要**再克隆官方仓库。
 
-<div align="center">
-  <a href="https://paperswithcode.co/api/v1/papers/2609.08936/leaderboard-badge-link?eval=29442" target="_blank"><img src="https://paperswithcode.co/api/v1/papers/2609.08936/leaderboard-badge.svg?eval=29442&amp;live=1" height="22px"></a>
-  <a href="https://paperswithcode.co/api/v1/papers/2609.08936/leaderboard-badge-link?eval=29438" target="_blank"><img src="https://paperswithcode.co/api/v1/papers/2609.08936/leaderboard-badge.svg?eval=29438&amp;live=1" height="22px"></a>
-  <a href="https://paperswithcode.co/api/v1/papers/2609.08936/leaderboard-badge-link?eval=29440" target="_blank"><img src="https://paperswithcode.co/api/v1/papers/2609.08936/leaderboard-badge.svg?eval=29440&amp;live=1" height="22px"></a>
-</div>
+## 能做什么
 
-<p align="center">
-💻 Try our model on the <a href="https://huggingface.co/spaces/tencent/AuK">HuggingFace Space</a> · <a href="https://modelscope.cn/studios/Tencent-Hunyuan/AuK">ModelScope Space</a>!
-</p>
+- **9 个任务视图**：声音克隆、指令 TTS、语音内容编辑、歌词编辑、语速/音量/音调、情感编辑、音色/口音/耳语/非语言声、语音与音乐分离、音频增强；另有功能中心、历史记录、模型与设置。
+- **官方句式**：Web 路径不经过 Prompt Enhancer，所以页面自己按 `src/auk/infer/pe.config.yaml` 与 Cookbook 的官方模板拼指令、算目标时长，避免把用户随手写的散文原样喂给模型。内置官方素材案例可一键载入。
+- **长文本分段**：`/api/plan` 在不加载模型的前提下预告「分几段、大约多久」，生成时按段回报进度。
+- **结果可核对**：每张结果卡带播放器、实际时长 / 目标时长 / 耗时 / seed，可与原音频 A/B 对比，也可带参数重跑；历史页记录本浏览器的生成结果。
+- **显存策略开关** + 顶部 CPU/内存/显存资源条 + 深浅色主题 + 取消等待按钮。
+- **全链路日志**：服务进程、模型子进程、启动器三份日志，靠 8 位日志编号串起来。
 
-## News
+## 环境要求
 
-- **[2026/09/16]** 💻 Reduced encoder memory by **~7.5 GiB**, making local inference more accessible on **consumer GPUs**. See [PR #19](https://github.com/Tencent-Hunyuan/AuK/pull/19).
-- **[2026/09/13]** 🍎🖥️ **AuK** now officially supports **MLX inference on Apple Silicon** (available on the [feat/mlx-apple-silicon](https://github.com/Tencent-Hunyuan/AuK/tree/feat/mlx-apple-silicon) branch) and **CPU offload for CUDA inference**.
-- **[2026/09/13]** 🏆 **AuK** serves as the end-to-end baseline for the **Single Model Track** of the [ICASSP 2027 Audio Editing Challenge](https://audio-editing-challenge.github.io/).
-- **[2026/09/09]** 🙌 Thanks to **SGLang-Omni** for Day 0 support for **AuK** and **AuK-Flash**! Check out the [SGLang-Omni cookbook](https://sgl-project.github.io/sglang-omni/cookbook/auk.html) to get started.
-- **[2026/09/09]** 🎉 We open-source **AuK**. Code and model weights are publicly available. Try it on the [🤗 Demo Space](https://huggingface.co/spaces/tencent/AuK) or the [🤖 ModelScope Space](https://modelscope.cn/studios/Tencent-Hunyuan/AuK)!
-
-### Demo
-
-<details open>
-<summary>English</summary>
-
-https://github.com/user-attachments/assets/d07332fc-5f69-4f16-9d00-a7443cc19e6a
-
-</details>
-
-<details>
-<summary>中文</summary>
-
-https://github.com/user-attachments/assets/c532bbdb-e6ce-4434-a9a5-16f29a8d4135
-
-</details>
-
-## Contents
-
-- [News](#news)
-- [Introduction](#introduction)
-- [Performance](#performance)
-- [Model Architecture](#model-architecture)
-- [Supported Tasks](#supported-tasks)
-- [Quick Start](#quick-start)
-  - [Installation](#installation)
-    - [uv](#uv)
-    - [Conda](#conda)
-  - [Download the weights](#download-the-weights)
-  - [Command-line inference](#command-line-inference)
-    - [Prompt Enhancer](#prompt-enhancer)
-    - [CLI Examples](#cli-examples)
-  - [Interactive Gradio demo](#interactive-gradio-demo)
-  - [ComfyUI](#comfyui)
-  - [Python API](#python-api)
-- [Fine-tuning](#fine-tuning)
-- [Contributing](#contributing)
-- [Acknowledgements](#acknowledgements)
-- [Citation](#citation)
-- [License](#license)
-
-## Introduction
-
-**AuK** is a 1.5B foundation model for speech generation and editing. Trained on millions of hours of diverse audio data, AuK supports zero-shot and
-instruction-based TTS, content and acoustic editing, paralinguistic editing,
-speech enhancement, and source separation through a unified natural-language
-instruction interface. AuK has two variants:
-
-| Model | Description | Weight |
-| --- | --- | --- |
-| AuK | Base model for high-quality generation | 🤗 [Hugging Face](https://huggingface.co/tencent/AuK) · 🤖 [ModelScope](https://modelscope.cn/models/Tencent-Hunyuan/AuK) |
-| AuK-Flash | Distilled model for fast 4-step inference | 🤗 [Hugging Face](https://huggingface.co/tencent/AuK-Flash) · 🤖 [ModelScope](https://modelscope.cn/models/Tencent-Hunyuan/AuK-Flash) |
-
-## Performance
-
-![AuK performance across speech generation, editing, enhancement, and separation benchmarks](assets/performance.png)
-
-## Model Architecture
-
-![Model Architecture](assets/arch.png)
-
-## Supported Tasks
-
-AuK exposes every task through the same natural-language instruction interface. The table below groups the supported tasks by category, with a short description and a link to its section in the [Cookbook](docs/COOKBOOK.md), where you'll find instruction templates plus CLI and Python examples.
-
-<table>
-  <thead>
-    <tr>
-      <th>Category</th>
-      <th>Task</th>
-      <th>Description</th>
-      <th>Cookbook</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td rowspan="2">Speech Generation</td>
-      <td>Zero-shot TTS</td>
-      <td>Speak the target text in the voice of the reference audio.</td>
-      <td><a href="docs/COOKBOOK.md#11-zero-shot-tts">Zero-shot TTS</a></td>
-    </tr>
-    <tr>
-      <td>Instruct TTS</td>
-      <td>Generate speech from a voice description alone — no reference audio.</td>
-      <td><a href="docs/COOKBOOK.md#12-instruct-tts">Instruct TTS</a></td>
-    </tr>
-    <tr>
-      <td rowspan="2">Content Editing</td>
-      <td>Speech Content Editing</td>
-      <td>Rewrite <em>what is said</em> — replace, insert, or remove text.</td>
-      <td><a href="docs/COOKBOOK.md#21-speech-content-editing">Speech Content Editing</a></td>
-    </tr>
-    <tr>
-      <td>Lyric Editing</td>
-      <td>Rewrite lyrics in a singing recording while preserving the melody and voice.</td>
-      <td><a href="docs/COOKBOOK.md#22-lyric-editing">Lyric Editing</a></td>
-    </tr>
-    <tr>
-      <td rowspan="3">Acoustic Editing</td>
-      <td>Pitch Editing</td>
-      <td>Raise or lower the pitch by semitones.</td>
-      <td><a href="docs/COOKBOOK.md#31-pitch-editing">Pitch Editing</a></td>
-    </tr>
-    <tr>
-      <td>Speed Editing</td>
-      <td>Adjust the speaking rate; output length scales with the speed factor.</td>
-      <td><a href="docs/COOKBOOK.md#32-speed-editing">Speed Editing</a></td>
-    </tr>
-    <tr>
-      <td>Volume Editing</td>
-      <td>Raise or lower the volume by decibels.</td>
-      <td><a href="docs/COOKBOOK.md#33-volume-editing">Volume Editing</a></td>
-    </tr>
-    <tr>
-      <td rowspan="5">Paralinguistic Editing</td>
-      <td>Emotion</td>
-      <td>Change the emotion while preserving content and voice.</td>
-      <td><a href="docs/COOKBOOK.md#41-emotion">Emotion</a></td>
-    </tr>
-    <tr>
-      <td>Timbre</td>
-      <td>Change the timbre to a description while keeping the content unchanged.</td>
-      <td><a href="docs/COOKBOOK.md#42-timbre">Timbre</a></td>
-    </tr>
-    <tr>
-      <td>De-accent</td>
-      <td>Remove a regional accent while preserving the speaker's voice and content.</td>
-      <td><a href="docs/COOKBOOK.md#43-de-accent">De-accent</a></td>
-    </tr>
-    <tr>
-      <td>Nonverbal Editing</td>
-      <td>Remove or add nonverbal sounds such as breaths, laughs, or coughs.</td>
-      <td><a href="docs/COOKBOOK.md#44-nonverbal-editing">Nonverbal Editing</a></td>
-    </tr>
-    <tr>
-      <td>Whisper Conversion</td>
-      <td>Convert between normal speech and whisper while preserving speaker and content.</td>
-      <td><a href="docs/COOKBOOK.md#45-whisper-conversion">Whisper Conversion</a></td>
-    </tr>
-    <tr>
-      <td rowspan="4">Enhancement &amp; Separation</td>
-      <td>Speech Enhancement</td>
-      <td>Denoise, dereverberate, or restore natural, clear speech.</td>
-      <td><a href="docs/COOKBOOK.md#51-speech-enhancement">Speech Enhancement</a></td>
-    </tr>
-    <tr>
-      <td>Speech Separation</td>
-      <td>Keep one speaker by talking order and remove the others.</td>
-      <td><a href="docs/COOKBOOK.md#52-speech-separation">Speech Separation</a></td>
-    </tr>
-    <tr>
-      <td>Music Separation</td>
-      <td>Extract the singing voice from a mix, or keep all human voices.</td>
-      <td><a href="docs/COOKBOOK.md#53-music-separation">Music Separation</a></td>
-    </tr>
-    <tr>
-      <td>Target Speaker Extraction</td>
-      <td>Keep the target speaker identified by <em>what they say</em>.</td>
-      <td><a href="docs/COOKBOOK.md#54-target-speaker-extraction">Target Speaker Extraction</a></td>
-    </tr>
-  </tbody>
-</table>
-
-## Quick Start
-
-### Installation
-
-Clone the repository, then choose either **uv** or **Conda** to create an
-isolated Python 3.10 environment.
-
-```bash
-git clone https://github.com/Tencent-Hunyuan/AuK
-cd AuK
-```
-
-#### uv
-
-```bash
-# Create and activate a project-local environment.
-uv venv --python 3.10
-source .venv/bin/activate
-
-# Choose one installation target:
-# Core inference and CLI only
-uv pip install -e .
-
-# Core inference + Gradio + Prompt Enhancer + ASR
-uv pip install -e ".[gradio]"
-
-# Core inference + ComfyUI nodes + Prompt Enhancer + ASR
-uv pip install -e ".[comfyui]"
-
-# Core inference + fine-tuning
-uv pip install -e ".[train]"
-
-# Everything
-uv pip install -e ".[gradio,train]"
-```
-
-#### Conda
-
-```bash
-conda create -n auk python=3.10 -y
-conda activate auk
-
-# Choose one installation target:
-# Core inference and CLI only
-pip install -e .
-
-# Core inference + Gradio + Prompt Enhancer + ASR
-pip install -e ".[gradio]"
-
-# Core inference + ComfyUI nodes + Prompt Enhancer + ASR
-pip install -e ".[comfyui]"
-
-# Core inference + fine-tuning
-pip install -e ".[train]"
-
-# Everything
-pip install -e ".[gradio,train]"
-```
-
-The default installation includes PyTorch, TorchAudio, and TorchVision. If your
-platform requires a specific CPU or CUDA build, install a matching PyTorch stack
-for your platform first, then install AuK with either command above.
-
-### Download the weights
-**🤗 HuggingFace**
-
-```bash
-pip install -U "huggingface_hub[cli]"
-
-# AuK-Base
-hf download tencent/AuK --local-dir ./ckpts/AuK
-
-# AuK-Flash (4-step distilled) 
-hf download tencent/AuK-Flash --local-dir ./ckpts/AuK-Flash
-
-# MLLM Encoder
-hf download Qwen/Qwen2.5-Omni-3B  --local-dir ./ckpts/Qwen2.5-Omni-3B
-```
-
-**🤖 ModelScope**
-
-```bash
-pip install -U modelscope
-
-# AuK-Base
-modelscope download --model Tencent-Hunyuan/AuK --local_dir ./ckpts/AuK
-
-# AuK-Flash (4-step distilled)
-modelscope download --model Tencent-Hunyuan/AuK-Flash  --local_dir ./ckpts/AuK-Flash
-
-# MLLM Encoder
-modelscope download --model Qwen/Qwen2.5-Omni-3B --local_dir ./ckpts/Qwen2.5-Omni-3B
-```
-
-The expected directory structure is:
-
-```text
-ckpts/
-├── AuK/
-├── AuK-Flash/          # optional
-└── Qwen2.5-Omni-3B/
-```
-
-The model checkpoint contains the diffusion transformer and layer-fusion weights. The MLLM encoder and VAE are loaded from separate files at runtime, so missing `text_encoder.*` keys during checkpoint loading are expected.
-
-
-### Command-line inference
-
-> [!TIP]
-> When starting from a free-form request, we recommend using
-> [Prompt Enhancer](#prompt-enhancer). It prepares the model instruction, target
-> duration, and any required audio preprocessing, then prints a ready-to-run
-> one-line `auk-infer` command.
-
-#### Prompt Enhancer
-
-PE uses the same OpenAI-compatible LLM environment variables described above.
-Load them from `.env`, then run:
-
-```bash
-set -a
-source ./.env
-set +a
-
-python src/auk/infer/pe.py \
-  --audio assets/demo-input-audio/whisper/wh-w2n-zh-input.wav \
-  --instruction "Convert this whisper into normal speech while preserving the speaker and content." \
-  --asr auto
-```
-
-PE prints the generated command:
-
-```bash
-auk-infer \
-  --audio assets/after_pe/wh-w2n-zh-input.wav \
-  --instruction 'Convert this whispered speech into normal speech.' \
-  --output assets/after_pe/wh-w2n-zh-input.output.wav \
-  --gen_seconds 8.58
-```
-
-The terminal also shows the detected task and target duration, and writes a
-compact JSON manifest under `assets/after_pe/`.
-
-#### CLI Examples
-
-All tasks use the same message-based interface. An `--instruction` is always required, while source or reference `--audio` is optional depending on the task. The examples below are just a taste — for the full instruction templates and per-task CLI examples, see the [Cookbook](docs/COOKBOOK.md).
-
-**Content editing**
-
-Rewrite what is *said* by describing the change in the instruction:
-
-```bash
-auk-infer \
-    --audio assets/demo-input-audio/content-edit/content.wav \
-    --instruction "Replace 'but accepting what we cannot have' with 'and living well with dreams unmet'." \
-    --output out_content_edit.wav \
-    --gen_seconds 7.0
-```
-
-**Speech enhancement / separation**
-
-Denoising, enhancement, and source separation are the same message-driven call — just say what to keep or remove:
-
-```bash
-auk-infer \
-    --audio assets/demo-input-audio/vocal-extraction/vocal-1-input.wav \
-    --instruction "请将这段音频恢复成纯净人声版本：保留原本所有说话人，并去除其中的噪声和混响，输出等长的纯净语音。" \
-    --output out_denoise.wav
-```
-
-**Zero-shot TTS**
-
-Write the target text into the instruction, then hint the duration with `--gen_text`
-(+ optional `--ref_text`, the reference transcript) or an explicit `--gen_seconds`:
-
-```bash
-auk-infer \
-    --audio assets/demo-input-audio/zero-shot-tts/ref.wav \
-    --instruction "Say the following with the same voice: 'Ladies and gentlemen, it's an honor to have the opportunity to address such a distinguished audience'" \
-    --output out_tts.wav \
-    --gen_seconds 6.0
-```
-
-To use AuK-Flash, set:
-
-```bash
---ckpt ckpts/AuK-Flash/auk_flash.safetensors
-```
-AuK-Flash use 4 fixed time steps and set CFG=0.
-
-**Lower VRAM usage (CUDA only)**
-
-Add `--cpu_offload` to `auk-infer` or `auk-gradio`, set `cpu_offload=True`
-when constructing `AukInfer`, or enable `cpu_offload` in ComfyUI's
-**AuK Model Loader**. It is disabled by default and works with both AuK variants.
-
-Peak VRAM measured on one NVIDIA A800-SXM4-80GB with bf16 inference:
-
-| Model | Input | CPU offload disabled | CPU offload enabled | VRAM saved |
-|---|---|---:|---:|---:|
-| AuK | Text only, 1.5 s output | 24.78 GiB | 16.75 GiB | 8.03 GiB (32.4%) |
-| AuK | 5 s reference audio | 25.00 GiB | 16.98 GiB | 8.02 GiB (32.1%) |
-| AuK-Flash | Text only, 1.5 s output | 24.77 GiB | 16.75 GiB | 8.02 GiB (32.4%) |
-| AuK-Flash | 5 s reference audio | 24.97 GiB | 16.98 GiB | 7.99 GiB (32.0%) |
-
-The table reports `torch.cuda.max_memory_allocated`; actual usage depends on
-input length, dtype, hardware, and software versions.
-
-### Interactive Gradio demo
-
-Install the Gradio dependencies with `pip install -e ".[gradio]"` (or the
-equivalent `uv pip install` command above) before starting the demo.
-
-Prompt Enhancer requires an OpenAI-compatible LLM:
-
-- LLM: [Tencent Cloud TokenHub](https://console.cloud.tencent.com/tokenhub/models)
-- Optional cloud ASR: [Tencent Cloud Recording File Recognition](https://cloud.tencent.com/document/product/1093/37823)
-
-Export the credentials before starting Gradio:
-
-```bash
-# Required when Prompt Enhancer is enabled
-export LLM_API_KEY="your-llm-api-key"
-export LLM_BASE_URL="https://tokenhub.tencentmaas.com/v1"
-export LLM_MODEL_NAME="hy3"
-
-# Optional cloud ASR; omit these to use local SenseVoiceSmall
-export TENCENTCLOUD_SECRET_ID="your-tencentcloud-secret-id"
-export TENCENTCLOUD_SECRET_KEY="your-tencentcloud-secret-key"
-export ASR_ENGINE_MODEL_TYPE="16k_zh_en"
-```
-
-Alternatively, copy the example file and load it:
-
-```bash
-cp .env.example .env
-set -a
-source ./.env
-set +a
-```
-
-`LLM_BASE_URL` should be the API root, without `/chat/completions`. For
-audio-backed PE tasks, Tencent Cloud recording-file recognition is used when
-its credentials are configured; if it is unavailable, AuK automatically
-downloads and lazily loads `iic/SenseVoiceSmall` as a CPU fallback. The
-`gradio` extra includes both cloud and local ASR dependencies.
-
-Choose the model according to your needs:
-
-- **AuK Base**: higher quality, with configurable NFE and CFG.
-- **AuK-Flash**: faster generation with fixed NFE=4 and CFG=0.
-- **Both**: exposes a model selector in the web UI.
-
-Recommended full command for loading both models on two GPUs:
-
-```bash
-auk-gradio \
-  --base_ckpt ckpts/AuK/auk_base.safetensors \
-  --flash_ckpt ckpts/AuK-Flash/auk_flash.safetensors \
-  --base_config ckpts/AuK/config.yaml \
-  --flash_config ckpts/AuK-Flash/config.yaml \
-  --qwen_path ckpts/Qwen2.5-Omni-3B \
-  --base_device cuda:0 \
-  --flash_device cuda:1 \
-  --dtype bf16 \
-  --host 0.0.0.0 \
-  --port 8080 \
-  --preload
-```
-
-The main options above mean:
-
-- `--base_ckpt` / `--flash_ckpt`: models exposed in the UI.
-- `--base_config` / `--flash_config`: optional when `config.yaml` is next to
-  its checkpoint.
-- `--qwen_path`: shared Qwen2.5-Omni-3B directory. If omitted, the path from
-  each model config is used.
-- `--base_device` / `--flash_device`: GPU used by each model.
-- `--preload`: load models during startup; without it, each model is loaded
-  on first use.
-- Defaults: `--dtype bf16`, `--host 0.0.0.0`, `--port 7860`.
-
-With the standard directory layout, the shortest command detects every
-installed variant under `ckpts/AuK` and `ckpts/AuK-Flash`:
-
-```bash
-auk-gradio
-```
-
-To expose only one model, pass only its checkpoint:
-
-```bash
-# Base only
-auk-gradio \
-  --base_ckpt ckpts/AuK/auk_base.safetensors \
-  --base_device cuda:0
-
-# Flash only
-auk-gradio \
-  --flash_ckpt ckpts/AuK-Flash/auk_flash.safetensors \
-  --flash_device cuda:0
-```
-
-To load both models on one GPU:
-
-```bash
-auk-gradio \
-  --base_device cuda:0 \
-  --flash_device cuda:0 \
-  --preload
-```
-
-Once either checkpoint option is supplied, only explicitly supplied variants
-are shown. The VAE is automatically loaded from `vae.safetensors` next to each
-checkpoint. The current implementation uses Qwen2.5-Omni-3B; Qwen3-Omni is not
-currently supported by `--qwen_path`.
-
-Other examples:
-
-```bash
-auk-gradio --share
-auk-gradio --port 8000
-```
-
-### ComfyUI
-
-Use **AuK Base** and **AuK-Flash** for speech generation, editing, enhancement,
-and separation through **AuK Model Loader** and **AuK Generate / Edit**.
-Install `.[comfyui]` in the environment that runs ComfyUI, link
-[`comfyui/ComfyUI-AuK`](comfyui/ComfyUI-AuK) into `ComfyUI/custom_nodes`, and
-open the reusable [`auk.json`](comfyui/workflows/auk.json) workflow.
-
-The included workflow starts with Base, PE disabled, and a 3-second text-only
-example. See the [ComfyUI guide](docs/COMFYUI.md) for installation,
-shared `.env` configuration, Flash settings, audio input/output,
-and the integration's 30-second source-plus-target sequence limit.
-
-### Python API
-
-The snippets below show a few representative tasks; for the full instruction templates and per-task Python examples, see the [Cookbook](docs/COOKBOOK.md).
-
-```python
-from auk.infer.infer_auk import AukInfer, save_audio
-
-engine = AukInfer(
-    "ckpts/AuK/config.yaml",
-    "ckpts/AuK/auk_base.safetensors",
-)
-
-# Content Editing. Task with reference audio
-messages = [
-    {
-        "role": "user",
-        "content": [
-            {"type": "text", "text": "Replace 'but accepting what we cannot have' with 'and living well with dreams unmet'."},
-            {"type": "audio", "audio": "assets/demo-input-audio/content-edit/content.wav"},
-        ],
-    }
-]
-
-audio, sample_rate = engine.generate(messages, gen_seconds=7.0)
-save_audio(audio, sample_rate, "out_content_edit.wav")
-
-# Instruct TTS. Task without reference audio
-messages = [
-    {
-        "role": "user",
-        "content": [
-            {"type": "text", "text": "请基于下面的描述: \"一位二十多岁的女生，在恋人刚回家时，用温柔、体贴、关心且略带撒娇的语气说话。声音柔和亲近，语速稍慢，音量适中，音色清甜自然，句尾轻轻上扬，语调温暖，口齿清晰。\",生成语音内容\"欢迎回来宝宝,今天上班累不累呀\"."},
-        ],
-    }
-]
-
-audio, sr = engine.generate(messages, gen_seconds=4.0)
-save_audio(audio, sr, "instruct.wav")
-```
-
-## Fine-tuning
-
-AuK provides a lightweight fine-tuning pipeline in [`src/auk/train/train.py`](src/auk/train/train.py). Training data is a JSONL file where each line is one source-target pair: the `user` message carries the instruction and optional source/reference audio, the `assistant` message carries the target audio, and `duration` (target seconds) drives dynamic batching.
-
-```json
-{
-  "duration": 5.66,
-  "messages": [
-    {
-      "role": "user",
-      "content": [
-        {"type": "text", "text": "Say the following with the same voice: \"你好，这是一次语音合成测试。\""},
-        {"type": "audio", "audio_url": "/abs/path/ref.wav"}
-      ]
-    },
-    {
-      "role": "assistant",
-      "content": [
-        {"type": "audio", "audio_url": "/abs/path/target.wav"}
-      ]
-    }
-  ]
-}
-```
-
-All supported tasks use this same format — just change the instruction and the source/target audio (the audio field is omitted for instruction-only tasks). Set `train_jsonl` (and optionally `val_jsonl`) in [`scripts/train.sh`](scripts/train.sh), then run:
-
-```bash
-bash scripts/train.sh
-```
-
-> **📖 For the full guide** — configuration reference, dynamic batching, checkpoints & resuming, EMA, monitoring, and troubleshooting — see [**docs/FINETUNING.md**](docs/FINETUNING.md).
-
-## Contributing
-
-Contributions are welcome — bug reports, documentation, tests, inference fixes, UI improvements, and performance work. Please read the [Contributing Guide](docs/CONTRIBUTING.md) before opening an issue or pull request, and note that all participation is governed by our [Code of Conduct](docs/CODE_OF_CONDUCT.md).
-
-## Acknowledgements
-- [SGLang-Omni](https://github.com/sgl-project/sglang-omni) for Day-0 support and inference serving for AuK and AuK-Flash
-- [Xinference](https://github.com/xorbitsai/inference) for TTS, voice design, and zero-shot TTS integration
-- [ComfyUI-AuK](https://github.com/Saganaki22/ComfyUI-AuK) by [Saganaki22](https://github.com/Saganaki22) for community ComfyUI integration, and [drbaph](https://huggingface.co/drbaph) for [converted and quantized checkpoints](https://huggingface.co/drbaph/AuK-comfyui)
-- [ICASSP 2027 Audio Editing Challenge](https://github.com/Audio-Editing-Challenge/Audio-Editing-Challenge-Baseline) for adopting AuK as the end-to-end baseline for the Single Model Track
-- [Awesome-Audio-Editing](https://github.com/Ruiqi-Yan/Awesome-Audio-Editing) for featuring AuK and curating audio editing research and resources
-
-## Citation
-
-If you find AuK useful in your research, please cite our work:
-
-```bibtex
-@misc{ma2026auktechnicalreportopensource,
-  title         = {AuK Technical Report: An Open-Source Foundational Model for Speech Generation and Editing},
-  author        = {Ziyang Ma and Zhikang Niu and Wenming Tu and Tianrui Wang and Ruiqi Yan and Junxi Liu and Yanru Huo and Nickk Huang and Yang Liu and Qicong Xie and Zeyu Xie and Hui Wang and Haitao Li and Zixuan Jiang and Yalin Li and Jie Fang and Yifan Duan and Zeyue Tian and Guangzheng Li and Haina Zhu and Shuyi Wang and Jinwen Wang and Mingyu Cui and Tian Tan and Auden and Sen Liang and Steve Yves and Shan Yang and Liefeng Bo and Zilong Zheng and Kai Yu and Eng-Siong Chng and Xie Chen},
-  year          = {2026},
-  eprint        = {2609.08936},
-  archivePrefix = {arXiv},
-  primaryClass  = {cs.SD},
-  url           = {https://arxiv.org/abs/2609.08936}
-}
-```
-
-
-## License
-
-AuK is released under the **MIT License**. See [`LICENSE`](LICENSE) for the full terms.
-
-
-
-# AuK Studio + FastAPI
-
-这是一个把 AuK 官方 Python 推理接口接到“AuK Studio”产品化前端的完整 Web 层项目。
-
-## 目录
-
-```text
-auk_studio_project/
-├─ backend/
-│  ├─ app.py
-│  └─ __init__.py
-├─ frontend/
-│  └─ index.html
-├─ uploads/
-├─ outputs/
-├─ requirements-web.txt
-├─ .env.example
-└─ run.py
-```
-
-## 重要说明
-
-本项目**不复制 Tencent-Hunyuan/AuK 模型源码或权重**。请先按照 AuK 官方仓库安装 AuK，并把本项目的 `backend/`、`frontend/` 等文件放到 AuK 仓库根目录，或者直接在该根目录运行本项目。
-
-官方 AuK 当前要求 Python 3.10，并提供 `AukInfer` Python API；Base 和 Flash 都通过统一的 message/instruction 接口完成 TTS、内容编辑、情感、音色、去口音、非语言编辑、增强和分离等任务。
+| 项 | 结论 |
+| --- | --- |
+| Python | 3.10（`.python-version` 锁的就是它；`requires-python >=3.10`） |
+| PyTorch | 2.7.x。uv 会按 `pytorch-cu126` 索引取 CUDA 12.6 轮子（`pyproject.toml` 已配好）；用 pip 装到的是 PyPI 默认轮子，要指定 CUDA 就自己加 `--index-url` |
+| 显存 8GB | 可以跑。默认**分页**策略，实测卡在 RTX 3060 Ti 8GB |
+| 显存 14GB+ | 才可能用**全常驻**策略（bf16 权重约 12.8GB：Qwen 8.1 + DiT 3.1 + fp32 VAE 0.6，再加 CUDA context 与激活）；30GB 以上宽裕 |
+| 内存 / 页面文件 | 本机实测一次分页加载约提交 16.9GB 虚拟内存，可用提交低于 18GB 时启动器会警告。建议 32GB 内存，或把页面文件调大 |
+| 磁盘 | 代码仓库约 30MB；权重另计（Base 与 Flash 各一份 safetensors） |
 
 ## 安装
 
-在官方 AuK 仓库根目录：
-
 ```bash
-# 先安装官方 AuK（按官方 README 选择 uv 或 pip）
-pip install -e .
+# 1) 建环境（.venv 放在项目根目录，bat 认这个位置）
+uv venv --python 3.10                  # 或 python -m venv .venv
+.venv\Scripts\activate                 # Windows；Linux/macOS 用 source .venv/bin/activate
 
-# 再安装本 Web 层
-pip install -r requirements-web.txt
+# 2) 装 Web 层依赖 + 模型包（可编辑安装，把 src/auk 注册进环境）
+uv pip install -r requirements-web.txt
+uv pip install -e .
 ```
 
-如果需要官方 Gradio/Prompt Enhancer 依赖，可以继续按官方文档安装 `.[gradio]`，本 Web 层本身不依赖 Gradio。
+用 pip 替换上面的 `uv pip` 也完全可以。不要用 `uv sync`：Web 层依赖写在 `requirements-web.txt`，不在 `[project.dependencies]` 里，`uv sync` 装不出 fastapi。
 
-## 下载模型
+需要官方 Gradio / Prompt Enhancer / ComfyUI 的额外依赖时再装 `.[gradio]` 或 `.[comfyui]` 这些 extras；本工作台不依赖它们。
 
-推荐保持官方目录结构：
+**改过包名之后要重装**：本包从 `auk` 改名为 `auk-studio`，旧的可编辑安装会在环境里留下 `auk-0.1.0.dist-info` 与 `__editable__.auk-0.1.0.pth`。二者并存时 `import auk` 可能指向旧路径，请删掉这两个文件后再跑一次 `uv pip install -e .`。
+
+## 准备权重
+
+推荐保持官方目录结构（该目录内容不入库，只留 `.gitkeep`）：
 
 ```text
 ckpts/
-├─ AuK/
-│  ├─ config.yaml
-│  └─ auk_base.safetensors
-├─ AuK-Flash/
-│  ├─ config.yaml
-│  └─ auk_flash.safetensors
+├─ AuK/          config.yaml + auk_base.safetensors
+├─ AuK-Flash/    config.yaml + auk_flash.safetensors
 └─ Qwen2.5-Omni-3B/
 ```
 
-如果路径不同，在启动前设置环境变量：
-
-```bash
-export AUK_BASE_CKPT=/path/to/auk_base.safetensors
-export AUK_BASE_CONFIG=/path/to/config.yaml
-export AUK_FLASH_CKPT=/path/to/auk_flash.safetensors
-export AUK_FLASH_CONFIG=/path/to/flash-config.yaml
-```
-
-Windows PowerShell：
+下载地址与镜像见 [docs/AuK-MODEL.md → Download the weights](docs/AuK-MODEL.md#download-the-weights)。路径不同时用环境变量指过去：
 
 ```powershell
 $env:AUK_BASE_CKPT="D:\AuK\ckpts\AuK\auk_base.safetensors"
@@ -710,27 +66,68 @@ $env:AUK_FLASH_CONFIG="D:\AuK\ckpts\AuK-Flash\config.yaml"
 
 ## 启动
 
+双击 `启动AuK-Studio.bat`：它先检查 `.venv` 是否存在、`import fastapi, uvicorn, pydantic, auk` 能否通过，再交给 `run.py`。命令行启动等价：
+
 ```bash
-python run.py
+python run.py                 # 默认 127.0.0.1:8080，就绪后自动打开浏览器
+python run.py --no-browser    # 不打开浏览器
+python run.py --stop          # 只清理端口上的实例及其模型子进程
 ```
 
-首次使用不必先加载模型：页面里点「加载模型」即可。默认走**分页加载**（编码器逐层上卡，慢一些但小卡装得下）；在「模型与设置 → 显存策略」切成**全常驻**可以省掉逐层搬运，代价是 bf16 权重约 12.8GB 加上 CUDA context 必须整个进显存，实测门槛是 14GB 以上——显存不够时页面会先把状态标成警告，硬切过去则在加载时报显存不足并提示切回分页。想用命令行定死默认策略就设 `AUK_RESIDENT=1`（页面里的选择优先于它）。
+然后打开 `http://127.0.0.1:8080`，健康检查 `http://127.0.0.1:8080/api/health`。
 
-然后打开：
+启动器语义（`run.py`）：
+
+- 端口上已经是 AuK 服务 → **结束旧实例、用当前代码重启**（若旧实例跑的是被改之前的 `backend/app.py`，会额外提示）。
+- 端口上是不相干的进程 → 报错退出，不去结束它；想并行就换端口（`AUK_PORT=8081`）。
+- 服务进程被 Job Object 包住：关掉控制台、Ctrl+C、异常退出时，模型子进程一并回收，不留占显存的孤儿。
+- 首次使用不必先加载模型，页面里点「加载模型」即可；换模型或换显存策略需要重新加载（约 20s）。
+
+## 显存策略
+
+默认**分页加载**：编码器逐层上卡，慢一些但 8GB 卡装得下。切成**全常驻**可省掉逐层搬运，代价是权重必须整个进显存——实测门槛 14GB 以上。显存不够时页面会先把状态标成警告；硬切过去会在加载时报「显存不足」并提示切回分页。
+
+命令行定死默认值用 `AUK_RESIDENT=1`，但页面里的选择优先级更高。
+
+## 目录结构
 
 ```text
-http://127.0.0.1:8080
+auk-studio/
+├─ run.py                      启动器：单实例、进程树回收、启动器日志
+├─ 启动AuK-Studio.bat / 停止AuK-Studio.bat
+├─ backend/
+│  ├─ app.py                   路由 + ModelSupervisor + spawn 模型子进程
+│  └─ logging_setup.py         日志骨架与请求编号
+├─ frontend/index.html         单文件工作台，无构建步骤
+├─ src/auk/                    上游模型代码（infer/、model/、train/、pe.config.yaml）
+├─ comfyui/                    ComfyUI 自定义节点与工作流
+├─ assets/demo-input-audio/    官方案例素材，后端挂在 /demo-audio
+├─ ckpts/                      权重目录（内容不入库）
+├─ uploads/ outputs/ logs/     运行时目录（不入库）
+├─ docs/                       AuK-MODEL、COOKBOOK、COMFYUI、FINETUNING、CONTRIBUTING
+└─ pyproject.toml  uv.lock  requirements-web.txt  .env.example
 ```
 
-接口健康检查：
+## 环境变量
 
-```text
-http://127.0.0.1:8080/api/health
-```
+| 变量 | 默认 | 作用 |
+| --- | --- | --- |
+| `AUK_HOST` | `127.0.0.1` | 监听地址。工作台无鉴权且能删文件，别随意暴露到局域网 |
+| `AUK_PORT` | `8080` | 端口；被非 AuK 进程占用时启动器会拒绝启动 |
+| `AUK_OPEN_BROWSER` | `1` | 设 `0` 不自动开浏览器（等价 `--no-browser`） |
+| `AUK_BASE_CKPT` / `AUK_BASE_CONFIG` | `./ckpts/AuK/…` | Base 权重与配置 |
+| `AUK_FLASH_CKPT` / `AUK_FLASH_CONFIG` | `./ckpts/AuK-Flash/…` | Flash 权重与配置 |
+| `AUK_RESIDENT` | `0` | `1` = 默认全常驻，页面选择仍优先 |
+| `AUK_MODEL_TIMEOUT` | `0` | 加载/生成时限（秒）。`0` = 不限时，用页面的「取消等待」中止 |
+| `AUK_LOG_DIR` | `./logs` | 日志目录；并行实例请分开设 |
+| `AUK_LOG_LEVEL` | `INFO` | 日志级别 |
+| `AUK_DEBUG` | 未设 | 设 `1` 时控制台只报 INFO，日志文件里保留 DEBUG 明细 |
+
+`.env.example` 列的是**上游 Prompt Enhancer** 需要的 LLM / 云 ASR 密钥，本仓库代码不会自动加载 `.env`，需要时请自行导出到环境。
 
 ## 日志与故障定位
 
-所有报错都会落到项目根目录的 `logs/`（已被 git 忽略，单个文件满 10MB 自动滚动，最多留 5 份）：
+所有报错都落到 `logs/`（已 git 忽略，单文件满 10MB 自动滚动，最多留 5 份）：
 
 | 文件 | 谁在写 | 里面有什么 |
 | --- | --- | --- |
@@ -738,40 +135,49 @@ http://127.0.0.1:8080/api/health
 | `logs/server.log` | FastAPI 服务进程 | 每个请求一行（含耗时）、4xx 的用户可见提示、5xx 的堆栈与内存/显存快照、浏览器上报的错误 |
 | `logs/worker.log` | 模型子进程 | 导入 torch → 加载权重 → 逐段推理 → 落盘，每个阶段的起止与显存 |
 
-定位方式：每个请求分配一个 8 位日志编号（响应头 `X-Auk-Rid`，5xx 提示里写作「日志编号 xxxxxxxx」），同一个编号会同时出现在 `server.log` 和 `worker.log`，`grep` 一次即可串起两个进程。模型进程被系统杀掉时（原生崩溃、提交内存耗尽），服务进程会把「当时在做什么 + 已等待多久 + 内存/显存读数 + 模型日志末尾 20 行」一并写进 `server.log`，所以一个文件就够定位。
-
-反馈问题时请附上这三个文件（或截图里的日志编号）。常用的两个开关：
+每个请求分配一个 8 位日志编号（响应头 `X-Auk-Rid`，5xx 提示里写作「日志编号 xxxxxxxx」），同一个编号会同时出现在 `server.log` 和 `worker.log`，`grep` 一次即可串起两个进程。模型进程被系统杀掉时（原生崩溃、提交内存耗尽），服务进程会把「当时在做什么 + 已等待多久 + 内存/显存读数 + 模型日志末尾 20 行」一并写进 `server.log`，所以一个文件就够定位。
 
 ```bash
-AUK_DEBUG=1 python run.py        # 控制台只报 INFO，但日志文件里保留 DEBUG 明细
-AUK_LOG_DIR=D:\tmp\logs python run.py   # 并行跑第二个实例时换个日志目录，避免互相滚动
-AUK_MODEL_TIMEOUT=0 python run.py  # 模型操作默认不设时限；设为正数（秒）后超时记 504
+AUK_DEBUG=1 python run.py               # 控制台安静，日志文件留 DEBUG 明细
+AUK_LOG_DIR=D:\tmp\logs python run.py   # 第二个实例换目录，避免互相滚动
+AUK_MODEL_TIMEOUT=600 python run.py     # 给模型操作加硬时限
 ```
 
-## API
+## HTTP 接口
 
-### `POST /api/generate`
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/health` | 服务与模型状态（页面启动探测） |
+| GET | `/api/system` | CPU / 内存 / 显存读数 |
+| POST | `/api/model/load` | `model=base\|flash`、`resident=0\|1` |
+| POST | `/api/model/unload` | 卸载模型并回收显存 |
+| POST | `/api/model/abort` | 取消当前加载/生成（页面的「取消等待」） |
+| GET | `/api/model/status` | 加载/生成进度 |
+| POST | `/api/plan` | `text`、`ref_name`、`ref_seconds`、`ref_range`、`emotion` → 分段预览 |
+| POST | `/api/generate` | 见下方说明 |
+| GET | `/api/audio/{job_id}` | 结果 WAV |
+| GET | `/api/input/{name}` | 回读已上传的输入音频（A/B 对比、重跑） |
+| POST | `/api/log/client` | 前端错误上报，写进 `server.log` |
+| GET | `/demo-audio/*`、`/*` | 静态素材与页面 |
 
-表单字段：
+`POST /api/generate` 表单字段：`instruction`（必填）、`model`（`base`/`flash`，默认 `flash`）、`gen_seconds`、`emotion`、`seed`、`task`（页面声明官方任务名，用于后处理门控）、`text`、`input_name`、`ref_range`、`input_duration`、`audio`（文件）。`gen_seconds=0` 表示「与输入音频等长」，纯文本生成必须给正数。服务端把指令转成官方 message 格式后调用 `engine.generate(...)`，结果存为 WAV 并返回 `/api/audio/{job_id}`。
 
-- `instruction`: AuK 自然语言指令
-- `model`: `base` 或 `flash`
-- `gen_seconds`: 目标生成时长
-- `audio`: 可选源音频/参考音频
+## 常见问题
 
-服务端会把它转换为 AuK 官方 Python API 使用的 message 格式，然后调用：
+- **改了后端没反应**：`run.py` 用 `reload=False`，重启才生效（再跑一次 bat 就会替换旧实例）。前端改动用 Ctrl+F5 强刷。
+- **加载报 `WinError 1455`（页面文件太小）**：多半是残留的模型子进程还在占用提交内存。`python run.py --stop` 清场后重试。
+- **想在局域网访问**：除了 `AUK_HOST=0.0.0.0`，还要改 `backend/app.py` 里的 CORS `allow_origins`。工作台没有鉴权且能删文件，请只在可信网络开启。
+- **文件留存**：`uploads/` 超过 7 天自动清理（A/B 对比与重跑依赖它），`outputs/` 不自动删除，需要手动清空。
+- **人声分离响度**：官方行为是「限到 −14 LUFS 再封顶 0.95 峰值」，环境里没装 `pyloudnorm` 时退化为只封顶峰值；装一次 `pip install pyloudnorm` 即可解锁完整行为。
 
-```python
-engine.generate(messages, gen_seconds=...)
-```
+## 关于上游 AuK 模型
 
-结果保存为 WAV，并返回 `/api/audio/{job_id}`。
+- [docs/AuK-MODEL.md](docs/AuK-MODEL.md) — 模型介绍、性能基准、架构、支持任务、权重下载、CLI / Gradio / ComfyUI / Python API 用法、微调与引用条目。
+- [docs/COOKBOOK.md](docs/COOKBOOK.md) — 各任务的官方指令模板与示例。
+- [docs/COMFYUI.md](docs/COMFYUI.md) · [docs/FINETUNING.md](docs/FINETUNING.md) · [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)
+- 许可：代码与模型权重由上游以 **MIT License** 发布，详见 [`LICENSE`](LICENSE)；`auk-studio` 这层 Web 工作台沿用同一许可。
 
-## 前端
-
-原来的 AuK Studio 页面保留作为产品化 UI 基础，并增加了真实后端接入层。核心“参考音频 → 文本/指令 → 生成 → 播放/下载”可以走真实 AuK 推理，而不是原来的纯演示进度条。
-
-后续可以继续扩展：
+## 后续可扩展
 
 1. 真正的任务队列（避免多个 GPU 推理同时抢显存）
 2. WebSocket/SSE 实时任务进度
