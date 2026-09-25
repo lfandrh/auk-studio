@@ -54,3 +54,6 @@ AGENTS.md
 # runtime artifacts / user uploads (local only)
 outputs/
 uploads/
+
+# per-process rotating logs (launcher.log / server.log / worker.log)
+logs/

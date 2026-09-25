@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import math
 import os
+from contextlib import contextmanager
 
 import torch
 import torchaudio
@@ -37,6 +38,7 @@ class AukInfer:
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.dtype = _DTYPE_MAP.get(dtype, torch.bfloat16)
         self.cpu_offload = cpu_offload
+        self._batch_depth = 0
         if cpu_offload and (not self.device.startswith("cuda") or not torch.cuda.is_available()):
             raise ValueError("cpu_offload requires a CUDA device.")
         load_device = "cpu" if cpu_offload else self.device
@@ -286,6 +288,31 @@ class AukInfer:
 
     # ------------------------------------------------------------------ public API
 
+    def _release(self):
+        """Page the offloaded modules back to CPU (no-op when everything is resident)."""
+        if self.cpu_offload:
+            self.model.transformer.clear_cache()
+            for hook in self._offload_hooks:
+                hook.offload()
+            with torch.cuda.device(self.device):
+                torch.cuda.empty_cache()
+
+    @contextmanager
+    def batch(self):
+        """Hold the offloaded weights resident across several ``generate()`` calls.
+
+        Each ``generate()`` normally ends by paging the whole transformer back to CPU, which
+        for an 8GB card costs far more than a short segment of inference. A multi-segment job
+        wraps its loop in this scope so the teardown happens once, at the outermost exit.
+        """
+        self._batch_depth += 1
+        try:
+            yield self
+        finally:
+            self._batch_depth -= 1
+            if self._batch_depth == 0:
+                self._release()
+
     def generate(
         self,
         messages: list,  # caller-composed ChatML turns (must carry a user audio item)
@@ -341,12 +368,8 @@ class AukInfer:
                 seed=seed,
             )
         finally:
-            if self.cpu_offload:
-                self.model.transformer.clear_cache()
-                for hook in self._offload_hooks:
-                    hook.offload()
-                with torch.cuda.device(self.device):
-                    torch.cuda.empty_cache()
+            if self._batch_depth == 0:
+                self._release()
         return audio_out, self.target_sample_rate
 
 

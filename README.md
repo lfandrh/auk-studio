@@ -697,7 +697,6 @@ export AUK_BASE_CKPT=/path/to/auk_base.safetensors
 export AUK_BASE_CONFIG=/path/to/config.yaml
 export AUK_FLASH_CKPT=/path/to/auk_flash.safetensors
 export AUK_FLASH_CONFIG=/path/to/flash-config.yaml
-export AUK_CPU_OFFLOAD=1
 ```
 
 Windows PowerShell：
@@ -707,7 +706,6 @@ $env:AUK_BASE_CKPT="D:\AuK\ckpts\AuK\auk_base.safetensors"
 $env:AUK_BASE_CONFIG="D:\AuK\ckpts\AuK\config.yaml"
 $env:AUK_FLASH_CKPT="D:\AuK\ckpts\AuK-Flash\auk_flash.safetensors"
 $env:AUK_FLASH_CONFIG="D:\AuK\ckpts\AuK-Flash\config.yaml"
-$env:AUK_CPU_OFFLOAD="1"
 ```
 
 ## 启动
@@ -715,6 +713,8 @@ $env:AUK_CPU_OFFLOAD="1"
 ```bash
 python run.py
 ```
+
+首次使用不必先加载模型：页面里点「加载模型」即可。默认走**分页加载**（编码器逐层上卡，慢一些但小卡装得下）；在「模型与设置 → 显存策略」切成**全常驻**可以省掉逐层搬运，代价是 bf16 权重约 12.8GB 加上 CUDA context 必须整个进显存，实测门槛是 14GB 以上——显存不够时页面会先把状态标成警告，硬切过去则在加载时报显存不足并提示切回分页。想用命令行定死默认策略就设 `AUK_RESIDENT=1`（页面里的选择优先于它）。
 
 然后打开：
 
@@ -726,6 +726,26 @@ http://127.0.0.1:8080
 
 ```text
 http://127.0.0.1:8080/api/health
+```
+
+## 日志与故障定位
+
+所有报错都会落到项目根目录的 `logs/`（已被 git 忽略，单个文件满 10MB 自动滚动，最多留 5 份）：
+
+| 文件 | 谁在写 | 里面有什么 |
+| --- | --- | --- |
+| `logs/launcher.log` | `run.py` | 端口占用、替换旧实例、uvicorn 异常退出 |
+| `logs/server.log` | FastAPI 服务进程 | 每个请求一行（含耗时）、4xx 的用户可见提示、5xx 的堆栈与内存/显存快照、浏览器上报的错误 |
+| `logs/worker.log` | 模型子进程 | 导入 torch → 加载权重 → 逐段推理 → 落盘，每个阶段的起止与显存 |
+
+定位方式：每个请求分配一个 8 位日志编号（响应头 `X-Auk-Rid`，5xx 提示里写作「日志编号 xxxxxxxx」），同一个编号会同时出现在 `server.log` 和 `worker.log`，`grep` 一次即可串起两个进程。模型进程被系统杀掉时（原生崩溃、提交内存耗尽），服务进程会把「当时在做什么 + 已等待多久 + 内存/显存读数 + 模型日志末尾 20 行」一并写进 `server.log`，所以一个文件就够定位。
+
+反馈问题时请附上这三个文件（或截图里的日志编号）。常用的两个开关：
+
+```bash
+AUK_DEBUG=1 python run.py        # 控制台只报 INFO，但日志文件里保留 DEBUG 明细
+AUK_LOG_DIR=D:\tmp\logs python run.py   # 并行跑第二个实例时换个日志目录，避免互相滚动
+AUK_MODEL_TIMEOUT=0 python run.py  # 模型操作默认不设时限；设为正数（秒）后超时记 504
 ```
 
 ## API

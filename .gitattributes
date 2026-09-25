@@ -1,0 +1,9 @@
+# cmd.exe cannot parse a batch file whose blocks are delimited with bare LF: the body of
+# every `if (...)` is silently skipped, so a launcher that "runs" and does nothing is the
+# usual symptom. The committed blobs are LF, which is only turned into CRLF on checkout when
+# the cloner happens to have core.autocrlf=true -- pin it instead of hoping.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# These are sourced by bash on the training side; a CR there breaks `set -a` / shebangs.
+*.sh text eol=lf
